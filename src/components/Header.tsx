@@ -299,7 +299,7 @@ function AlertLocation({
       <span className="brief-loc-name">{loc.name}</span>
       {(high || health || detail) && (
         <span className="brief-loc-meta">
-          {high && <span className="prio High">High</span>}
+          {high && <span className="brief-mark">High</span>}
           {health && <span className={`brief-health ${health}`}>{health}</span>}
           {detail && <span>{detail}</span>}
         </span>
@@ -373,7 +373,7 @@ export function Alerts() {
         </div>
         <button
           type="button"
-          className="btn"
+          className="brief-copy"
           onClick={async () => {
             const t = digest();
             try {
