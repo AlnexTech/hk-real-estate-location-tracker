@@ -402,7 +402,7 @@ export function LocationDrawer() {
                 </button>
               ) : (
                 <div className="sub">
-                  Only a super admin can delete a location.
+                  Only an admin can delete a location.
                 </div>
               )}
             </div>

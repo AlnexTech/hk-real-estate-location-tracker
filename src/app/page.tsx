@@ -5,7 +5,6 @@ import { BoardView, TableView } from "@/components/BoardTable";
 import { LocationDrawer } from "@/components/LocationDrawer";
 import { PlanView } from "@/components/PlanView";
 import { TrackerProvider, useTracker } from "@/lib/store";
-import { ThemeProvider } from "@/lib/theme";
 
 function TrackerApp() {
   const { ui, toast, hydrated } = useTracker();
@@ -40,10 +39,8 @@ function TrackerApp() {
 
 export default function Home() {
   return (
-    <ThemeProvider>
-      <TrackerProvider>
-        <TrackerApp />
-      </TrackerProvider>
-    </ThemeProvider>
+    <TrackerProvider>
+      <TrackerApp />
+    </TrackerProvider>
   );
 }

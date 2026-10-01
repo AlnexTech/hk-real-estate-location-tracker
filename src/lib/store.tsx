@@ -9,6 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useSession } from "next-auth/react";
 import {
   FOCUS,
   days,
@@ -16,10 +17,9 @@ import {
   prio,
   prank,
   searching,
-  slug,
   today,
 } from "./constants";
-import { DEFAULT_LAUNCH_TEMPLATE, SEED_LOCATIONS, SEED_UPDATES } from "./seed";
+import { DEFAULT_LAUNCH_TEMPLATE } from "./seed";
 import type {
   FocusKey,
   LaunchPlan,
@@ -29,15 +29,6 @@ import type {
   Update,
   ViewMode,
 } from "./types";
-
-const STORAGE_KEY = "hk-re-tracker-v1";
-
-interface Persisted {
-  locations: Location[];
-  updates: Update[];
-  plans: Record<string, LaunchPlan>;
-  template: LaunchTemplate;
-}
 
 interface TrackerContextValue {
   locations: Location[];
@@ -84,36 +75,26 @@ export interface AlertGroup {
 
 const TrackerContext = createContext<TrackerContextValue | null>(null);
 
-function loadPersisted(): Persisted {
-  if (typeof window === "undefined") {
-    return {
-      locations: SEED_LOCATIONS,
-      updates: SEED_UPDATES,
-      plans: {},
-      template: DEFAULT_LAUNCH_TEMPLATE,
-    };
+async function api<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...(init?.headers || {}),
+    },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(
+      typeof data?.error === "string" ? data.error : `Request failed (${res.status})`,
+    );
   }
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as Persisted;
-      if (parsed.locations?.length) return parsed;
-    }
-  } catch {
-    /* ignore */
-  }
-  return {
-    locations: SEED_LOCATIONS,
-    updates: SEED_UPDATES,
-    plans: {},
-    template: DEFAULT_LAUNCH_TEMPLATE,
-  };
+  return data as T;
 }
 
 export function TrackerProvider({ children }: { children: ReactNode }) {
-  const [hydrated, setHydrated] = useState(false);
-  const [locations, setLocations] = useState<Location[]>(SEED_LOCATIONS);
-  const [updates, setUpdates] = useState<Update[]>(SEED_UPDATES);
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [updates, setUpdates] = useState<Update[]>([]);
   const [plans, setPlans] = useState<Record<string, LaunchPlan>>({});
   const [template, setTemplate] = useState<LaunchTemplate>(
     DEFAULT_LAUNCH_TEMPLATE,
@@ -130,30 +111,51 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const [planLoc, setPlanLoc] = useState("");
   const [toast, setToast] = useState<string | null>(null);
+  const [dataReady, setDataReady] = useState(false);
+  const { data: session, status } = useSession();
 
-  const canWrite = true;
-  const isAdmin = true;
-  const me = "You";
-
-  useEffect(() => {
-    const data = loadPersisted();
-    setLocations(data.locations);
-    setUpdates(data.updates);
-    setPlans(data.plans || {});
-    setTemplate(data.template || DEFAULT_LAUNCH_TEMPLATE);
-    setHydrated(true);
-  }, []);
-
-  useEffect(() => {
-    if (!hydrated) return;
-    const payload: Persisted = { locations, updates, plans, template };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-  }, [hydrated, locations, updates, plans, template]);
+  const isAdmin = session?.user?.role === "admin";
+  const canWrite =
+    session?.user?.role === "admin" || session?.user?.role === "agent";
+  const me = session?.user?.name || "You";
+  const ready = dataReady && status !== "loading";
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
     window.setTimeout(() => setToast(null), 1600);
   }, []);
+
+  const loadTracker = useCallback(async () => {
+    const data = await api<{
+      locations: Location[];
+      updates: Update[];
+      plans: Record<string, LaunchPlan>;
+      template: LaunchTemplate;
+    }>("/api/tracker");
+    setLocations(data.locations);
+    setUpdates(data.updates);
+    setPlans(data.plans || {});
+    setTemplate(data.template || DEFAULT_LAUNCH_TEMPLATE);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        await loadTracker();
+      } catch (error) {
+        console.error(error);
+        if (!cancelled) {
+          showToast("Failed to load from database");
+        }
+      } finally {
+        if (!cancelled) setDataReady(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [loadTracker, showToast]);
 
   const setUi = useCallback((patch: Partial<UiState>) => {
     setUiState((prev) => ({ ...prev, ...patch }));
@@ -166,7 +168,11 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
         if (ui.country && l.country !== ui.country) return false;
         if (ui.health && l.health !== ui.health) return false;
         if (ui.prio && prio(l) !== ui.prio) return false;
-        if (ui.focus && FOCUS[ui.focus as Exclude<FocusKey, "">] && !FOCUS[ui.focus as Exclude<FocusKey, "">].fn(l))
+        if (
+          ui.focus &&
+          FOCUS[ui.focus as Exclude<FocusKey, "">] &&
+          !FOCUS[ui.focus as Exclude<FocusKey, "">].fn(l)
+        )
           return false;
         if (ui.hideOpen && l.stage === "6 - Open") return false;
         if (
@@ -192,26 +198,26 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
         showToast("You have view-only access");
         return false;
       }
-      const l = locations.find((x) => x.id === locId);
-      const row: Update = {
-        id: `u${Date.now()}`,
-        locId,
-        locName: l?.name || "",
-        text,
-        at: today(),
-        by: me,
-        ts: Date.now(),
-      };
-      setUpdates((prev) => [row, ...prev]);
-      setLocations((prev) =>
-        prev.map((x) =>
-          x.id === locId ? { ...x, lastTouched: today() } : x,
-        ),
-      );
-      if (!quiet) showToast("Update posted");
-      return true;
+      try {
+        const { update } = await api<{ update: Update }>("/api/updates", {
+          method: "POST",
+          body: JSON.stringify({ locId, text }),
+        });
+        setUpdates((prev) => [update, ...prev]);
+        setLocations((prev) =>
+          prev.map((x) =>
+            x.id === locId ? { ...x, lastTouched: today() } : x,
+          ),
+        );
+        if (!quiet) showToast("Update posted");
+        return true;
+      } catch (error) {
+        console.error(error);
+        showToast("Failed to post update");
+        return false;
+      }
     },
-    [canWrite, locations, me, showToast],
+    [canWrite, showToast],
   );
 
   const saveLocation = useCallback(
@@ -224,36 +230,58 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
       setLocations((prev) =>
         prev.map((l) => (l.id === id ? { ...l, ...next } : l)),
       );
-      showToast("Saved");
-      if (logText) await postUpdate(id, logText, true);
+      try {
+        const result = await api<{ location: Location; update?: Update }>(
+          `/api/locations/${encodeURIComponent(id)}`,
+          {
+            method: "PATCH",
+            body: JSON.stringify({ patch, logText }),
+          },
+        );
+        setLocations((prev) =>
+          prev.map((l) => (l.id === id ? { ...l, ...result.location } : l)),
+        );
+        if (result.update) {
+          setUpdates((prev) => [result.update!, ...prev]);
+        }
+        showToast("Saved");
+      } catch (error) {
+        console.error(error);
+        showToast("Failed to save");
+        try {
+          await loadTracker();
+        } catch {
+          /* ignore */
+        }
+      }
     },
-    [canWrite, postUpdate, showToast],
+    [canWrite, loadTracker, showToast],
   );
 
   const addLocation = useCallback(
     async (name: string) => {
       if (!isAdmin) {
-        showToast("Only a super admin can add a location");
+        showToast("Only an admin can add a location");
         return null;
       }
-      const id = slug(name);
-      const loc: Location = {
-        id,
-        name: name.trim(),
-        stage: "2 - Site Search",
-        country: "USA",
-        ownership: "Franchise",
-        priority: "Normal",
-        lastTouched: today(),
-      };
-      setLocations((prev) => {
-        if (prev.some((x) => x.id === id)) {
-          return prev.map((x) => (x.id === id ? { ...x, ...loc } : x));
-        }
-        return [...prev, loc];
-      });
-      showToast("Added");
-      return id;
+      try {
+        const { location } = await api<{ location: Location }>("/api/locations", {
+          method: "POST",
+          body: JSON.stringify({ name }),
+        });
+        setLocations((prev) => {
+          if (prev.some((x) => x.id === location.id)) {
+            return prev.map((x) => (x.id === location.id ? location : x));
+          }
+          return [...prev, location];
+        });
+        showToast("Added");
+        return location.id;
+      } catch (error) {
+        console.error(error);
+        showToast("Failed to add location");
+        return null;
+      }
     },
     [isAdmin, showToast],
   );
@@ -261,17 +289,26 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
   const deleteLocation = useCallback(
     async (id: string) => {
       if (!isAdmin) {
-        showToast("Only a super admin can delete");
+        showToast("Only an admin can delete a location");
         return;
       }
-      setLocations((prev) => prev.filter((x) => x.id !== id));
-      setPlans((prev) => {
-        const next = { ...prev };
-        delete next[id];
-        return next;
-      });
-      setOpenId(null);
-      showToast("Deleted");
+      try {
+        await api(`/api/locations/${encodeURIComponent(id)}`, {
+          method: "DELETE",
+        });
+        setLocations((prev) => prev.filter((x) => x.id !== id));
+        setPlans((prev) => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+        setUpdates((prev) => prev.filter((u) => u.locId !== id));
+        setOpenId(null);
+        showToast("Deleted");
+      } catch (error) {
+        console.error(error);
+        showToast("Failed to delete");
+      }
     },
     [isAdmin, showToast],
   );
@@ -282,14 +319,31 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
         showToast("You have view-only access");
         return;
       }
-      setPlans((prev) => {
-        const cur = prev[id];
-        if (!cur) return prev;
-        return { ...prev, [id]: { ...cur, ...patch } };
-      });
-      showToast("Saved");
+      const current = plans[id];
+      if (!current) return;
+      const nextPlan = { ...current, ...patch };
+      setPlans((prev) => ({ ...prev, [id]: nextPlan }));
+      try {
+        const { plan } = await api<{ plan: LaunchPlan }>(
+          `/api/plans/${encodeURIComponent(id)}`,
+          {
+            method: "PUT",
+            body: JSON.stringify({ plan: nextPlan }),
+          },
+        );
+        setPlans((prev) => ({ ...prev, [id]: plan }));
+        showToast("Saved");
+      } catch (error) {
+        console.error(error);
+        showToast("Failed to save plan");
+        try {
+          await loadTracker();
+        } catch {
+          /* ignore */
+        }
+      }
     },
-    [canWrite, showToast],
+    [canWrite, loadTracker, plans, showToast],
   );
 
   const startPlan = useCallback(
@@ -298,41 +352,58 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
         showToast("You have view-only access");
         return;
       }
-      const doc: LaunchPlan = {
-        start,
-        tasks: template.tasks.map((t) => ({
-          ...t,
-          status: "Not Started" as const,
-        })),
-      };
-      setPlans((prev) => ({ ...prev, [id]: doc }));
-      showToast("Plan started");
+      try {
+        const { plan } = await api<{ plan: LaunchPlan }>(
+          `/api/plans/${encodeURIComponent(id)}`,
+          {
+            method: "PUT",
+            body: JSON.stringify({ action: "start", start }),
+          },
+        );
+        setPlans((prev) => ({ ...prev, [id]: plan }));
+        showToast("Plan started");
+      } catch (error) {
+        console.error(error);
+        showToast("Failed to start plan");
+      }
     },
-    [canWrite, showToast, template],
+    [canWrite, showToast],
   );
 
   const saveTemplateFromPlan = useCallback(
     async (id: string) => {
-      const p = plans[id];
-      if (!p) return;
-      setTemplate({
-        name: template.name,
-        days: template.days,
-        tasks: p.tasks.map(({ status: _s, ...t }) => t),
-      });
-      showToast("Saved as the default plan");
+      if (!isAdmin) {
+        showToast("Only an admin can save the default plan");
+        return;
+      }
+      try {
+        const { template: next } = await api<{ template: LaunchTemplate }>(
+          "/api/template",
+          {
+            method: "PUT",
+            body: JSON.stringify({ locationId: id }),
+          },
+        );
+        setTemplate(next);
+        showToast("Saved as the default plan");
+      } catch (error) {
+        console.error(error);
+        showToast("Failed to save template");
+      }
     },
-    [plans, showToast, template.days, template.name],
+    [isAdmin, showToast],
   );
 
   const resetData = useCallback(() => {
-    localStorage.removeItem(STORAGE_KEY);
-    setLocations(SEED_LOCATIONS);
-    setUpdates(SEED_UPDATES);
-    setPlans({});
-    setTemplate(DEFAULT_LAUNCH_TEMPLATE);
-    showToast("Reset to seed data");
-  }, [showToast]);
+    void (async () => {
+      try {
+        await loadTracker();
+        showToast("Reloaded from database");
+      } catch {
+        showToast("Failed to reload");
+      }
+    })();
+  }, [loadTracker, showToast]);
 
   const alertGroups = useCallback((): AlertGroup[] => {
     const act = (l: Location) =>
@@ -479,7 +550,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     canWrite,
     isAdmin,
     me,
-    hydrated,
+    hydrated: ready,
     filtered,
     openId,
     setOpenId,

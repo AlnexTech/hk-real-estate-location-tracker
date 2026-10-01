@@ -9,6 +9,9 @@ import {
   prio,
   searching,
 } from "@/lib/constants";
+import { AccountMenu } from "@/components/AccountMenu";
+import { roleLabel } from "@/lib/roles";
+import { useSession } from "next-auth/react";
 import { useTracker, type AlertGroup } from "@/lib/store";
 import type { FocusKey, Location, ViewMode } from "@/lib/types";
 import { useState } from "react";
@@ -20,17 +23,17 @@ export function Header() {
     locations,
     ui,
     setUi,
-    canWrite,
     isAdmin,
     addLocation,
     setOpenId,
   } = useTracker();
+  const { data: session } = useSession();
   const [addOpen, setAddOpen] = useState(false);
 
   const sub = `${locations.length} locations · ${new Date().toLocaleDateString(
     undefined,
     { month: "long", day: "numeric", year: "numeric" },
-  )}${canWrite ? "" : " · read only"}`;
+  )} · ${roleLabel(session?.user?.role)}`;
 
   return (
     <>
@@ -67,17 +70,16 @@ export function Header() {
             ))}
           </div>
           <ThemeToggle />
-          <button
-            type="button"
-            className="btn primary"
-            onClick={() => {
-              if (!canWrite) return;
-              if (!isAdmin) return;
-              setAddOpen(true);
-            }}
-          >
-            + Location
-          </button>
+          <AccountMenu />
+          {isAdmin && (
+            <button
+              type="button"
+              className="btn primary"
+              onClick={() => setAddOpen(true)}
+            >
+              + Location
+            </button>
+          )}
         </div>
       </header>
 
