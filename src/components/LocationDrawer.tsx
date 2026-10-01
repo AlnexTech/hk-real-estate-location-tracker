@@ -5,6 +5,7 @@ import {
   SHORT,
   STATUS_FIELDS,
   fmt,
+  healthLabel,
   prio,
   today,
 } from "@/lib/constants";
@@ -46,7 +47,9 @@ function FieldInput({
         onChange={(e) => onChange(key, e.target.value)}
       >
         {opts.map((o) => (
-          <option key={o || "__empty"}>{o}</option>
+          <option key={o || "__empty"} value={o}>
+            {key === "health" && o ? healthLabel(o) : o}
+          </option>
         ))}
       </select>
     );
@@ -199,7 +202,7 @@ export function LocationDrawer() {
           </h2>
           <div className="sub">
             {SHORT[loc.stage || ""] || loc.stage || ""}
-            {loc.health ? ` · ${loc.health}` : ""}
+            {loc.health ? ` · ${healthLabel(loc.health)}` : ""}
           </div>
 
           <div className="quick">

@@ -6,17 +6,15 @@ import {
   days,
   daysSince,
   fmt,
+  healthLabel,
   prio,
   searching,
 } from "@/lib/constants";
 import { AccountMenu } from "@/components/AccountMenu";
-import { roleLabel } from "@/lib/roles";
-import { useSession } from "next-auth/react";
 import { useTracker, type AlertGroup } from "@/lib/store";
 import type { FocusKey, Location, ViewMode } from "@/lib/types";
 import { useState } from "react";
 import { PromptModal } from "./Modal";
-import { ThemeToggle } from "./ThemeToggle";
 
 export function Header() {
   const {
@@ -27,29 +25,28 @@ export function Header() {
     addLocation,
     setOpenId,
   } = useTracker();
-  const { data: session } = useSession();
   const [addOpen, setAddOpen] = useState(false);
 
   const sub = `${locations.length} locations · ${new Date().toLocaleDateString(
     undefined,
     { month: "long", day: "numeric", year: "numeric" },
-  )} · ${roleLabel(session?.user?.role)}`;
+  )}`;
 
   return (
     <>
-      <header className="mb-4 flex flex-wrap items-end justify-between gap-4">
-        <div className="flex flex-col gap-1.5">
+      <header className="app-header">
+        <div className="app-brand">
           <img
             src="/hyperkidz-logo.png"
             alt="Hyper Kidz"
             className="brand-logo"
           />
-          <h1 className="text-[22px] font-semibold tracking-tight text-[var(--ink)]">
-            Real Estate Location Tracker
-          </h1>
-          <div className="sub">{sub}</div>
+          <div className="app-brand-copy">
+            <h1>Real Estate Location Tracker</h1>
+            <p className="sub">{sub}</p>
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="app-toolbar">
           <div className="seg" role="tablist" aria-label="View">
             {(
               [
@@ -69,7 +66,6 @@ export function Header() {
               </button>
             ))}
           </div>
-          <ThemeToggle />
           <AccountMenu />
           {isAdmin && (
             <button
@@ -138,10 +134,10 @@ export function Filters() {
         value={ui.health}
         onChange={(e) => setUi({ health: e.target.value })}
       >
-        <option value="">All health</option>
-        <option>Green</option>
-        <option>Yellow</option>
-        <option>Red</option>
+        <option value="">All lease health</option>
+        <option value="Green">On track</option>
+        <option value="Yellow">Watch</option>
+        <option value="Red">At risk</option>
       </select>
       <label className="flex items-center gap-1.5 text-[13px] text-[var(--muted)]">
         <input
@@ -186,7 +182,7 @@ export function Kpis() {
   const build = locations.filter(
     (l) => l.stage === "5 - Under Construction",
   ).length;
-  const red =
+  const atRisk =
     locations.filter((l) => l.health === "Red").length +
     locations.filter((l) => l.health === "Yellow").length;
   const late = locations.filter(
@@ -201,23 +197,65 @@ export function Kpis() {
   ).length;
   const longest = Math.max(0, ...locations.map((l) => searching(l) || 0));
 
-  const k: [string, number, boolean, FocusKey][] = [
-    ["Open", open, false, "open"],
-    ["In pipeline", pipe, false, "pipeline"],
-    ["High priority", hi, false, "high"],
-    ["LOI + Lease", loi, false, "loilease"],
-    ["Under construction", build, false, "build"],
-    ["Red or Yellow", red, red > 0, "flag"],
-    ["Target date passed", late, late > 0, "late"],
-    ["Longest search (days)", longest, longest >= 180, "searching"],
+  const k: {
+    label: string;
+    n: number;
+    tone: string;
+    hot: boolean;
+    focus: FocusKey;
+  }[] = [
+    { label: "Open", n: open, tone: "open", hot: false, focus: "open" },
+    {
+      label: "In pipeline",
+      n: pipe,
+      tone: "pipeline",
+      hot: false,
+      focus: "pipeline",
+    },
+    {
+      label: "High priority",
+      n: hi,
+      tone: "priority",
+      hot: hi > 0,
+      focus: "high",
+    },
+    { label: "LOI + Lease", n: loi, tone: "deal", hot: false, focus: "loilease" },
+    {
+      label: "Under construction",
+      n: build,
+      tone: "build",
+      hot: false,
+      focus: "build",
+    },
+    {
+      label: "Lease at risk",
+      n: atRisk,
+      tone: "risk",
+      hot: atRisk > 0,
+      focus: "flag",
+    },
+    {
+      label: "Target date passed",
+      n: late,
+      tone: "late",
+      hot: late > 0,
+      focus: "late",
+    },
+    {
+      label: "Longest search (days)",
+      n: longest,
+      tone: "search",
+      hot: longest >= 180,
+      focus: "searching",
+    },
   ];
 
   return (
-    <div className="mb-4 grid grid-cols-[repeat(auto-fit,minmax(130px,1fr))] gap-2.5">
-      {k.map(([label, n, warn, f]) => (
+    <div className="kpi-grid">
+      {k.map(({ label, n, tone, hot, focus: f }) => (
         <div
           key={f}
-          className={`kpi ${warn ? "warn" : ""}`}
+          className={`kpi tone-${tone}${hot ? " hot" : ""}`}
           role="button"
           tabIndex={0}
           aria-pressed={ui.focus === f}
@@ -302,7 +340,9 @@ function AlertLocation({
       {(high || health || detail) && (
         <span className="brief-loc-meta">
           {high && <span className="brief-mark">High</span>}
-          {health && <span className={`brief-health ${health}`}>{health}</span>}
+          {health && (
+            <span className={`pill ${health}`}>{healthLabel(health)}</span>
+          )}
           {detail && <span>{detail}</span>}
         </span>
       )}

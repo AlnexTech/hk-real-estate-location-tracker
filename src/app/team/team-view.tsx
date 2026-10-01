@@ -68,7 +68,7 @@ export function TeamView() {
   return (
     <AdminShell
       title="Team"
-      lede="Invite an admin or a real estate agent. They set their own password from the link."
+      lede="Invite an admin or a real estate agent. They get an email with a link to accept the role."
     >
       {error && <div className="auth-error">{error}</div>}
       <div className="team-grid">
@@ -88,11 +88,26 @@ export function TeamView() {
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({ email, role }),
                 });
-                const data = (await res.json()) as { url?: string; error?: string };
+                const data = (await res.json()) as {
+                  url?: string;
+                  emailed?: boolean;
+                  emailError?: string;
+                  error?: string;
+                };
                 if (!res.ok) throw new Error(data.error || "Could not create the invite");
+                const sentTo = email;
                 setLink(data.url || "");
                 setEmail("");
-                setNotice("Invite created. Copy the link now — it is only shown once.");
+                if (data.emailed) {
+                  setNotice(
+                    `Invite emailed to ${sentTo}. The link is also shown below in case it lands in spam.`,
+                  );
+                } else {
+                  setError(
+                    data.emailError ||
+                      "The invite was created, but the email could not be sent. Copy the link instead.",
+                  );
+                }
                 await load();
               } catch (err) {
                 setError(err instanceof Error ? err.message : "Could not create the invite");
@@ -124,7 +139,7 @@ export function TeamView() {
               </select>
             </label>
             <button type="submit" className="btn primary" disabled={pending}>
-              {pending ? "Sending…" : "Create invite"}
+              {pending ? "Sending…" : "Send invite"}
             </button>
           </form>
           {notice && <p className="auth-note">{notice}</p>}

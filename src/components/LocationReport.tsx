@@ -6,6 +6,7 @@ import {
   addDays,
   days,
   fmt,
+  healthLabel,
   planProgress,
   prio,
   searching,
@@ -69,6 +70,7 @@ function fieldText(def: FieldDef, loc: Location): { value: string; warn: boolean
   if (key === "drive" && /^https?:\/\//i.test(String(raw))) {
     return { value: String(raw), warn: false, href: String(raw) };
   }
+  if (key === "health") return { value: healthLabel(String(raw)), warn: false };
   return { value: String(raw), warn: false };
 }
 
@@ -272,9 +274,9 @@ export function LocationReport({
             <div className="report-chips">
               <span className="pill report-chip">{model.stage}</span>
               {loc.health ? (
-                <span className={`pill ${loc.health}`}>{loc.health}</span>
+                <span className={`pill ${loc.health}`}>{healthLabel(loc.health)}</span>
               ) : (
-                <span className="pill report-chip">Health not set</span>
+                <span className="pill report-chip">Lease health not set</span>
               )}
               <span className="pill report-chip">{prio(loc)}</span>
             </div>

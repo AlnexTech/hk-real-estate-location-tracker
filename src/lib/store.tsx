@@ -466,10 +466,10 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
       },
       {
         id: "flag",
-        k: "Marked at risk",
+        k: "Lease at risk",
         hard: false,
         watch: false,
-        why: "The team flagged these red or yellow.",
+        why: "Lease health is on watch or at risk.",
         items: locations.filter(
           (l) => l.health === "Red" || l.health === "Yellow",
         ),

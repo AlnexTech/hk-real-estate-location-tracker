@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { createInvite } from "@/lib/invites";
+import { sendInviteEmail } from "@/lib/mail";
 import { isAppRole } from "@/lib/roles";
 import { errorResponse, requireAdmin } from "@/lib/session";
 import { NextResponse } from "next/server";
@@ -7,7 +8,8 @@ import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
 function inviteUrl(request: Request, token: string) {
-  const origin = new URL(request.url).origin;
+  const configured = process.env.NEXTAUTH_URL?.replace(/\/$/, "");
+  const origin = configured || new URL(request.url).origin;
   return `${origin}/invite/${token}`;
 }
 
@@ -53,6 +55,24 @@ export async function POST(request: Request) {
     }
 
     const { invite, token } = await createInvite(actor, email, body.role);
+    const url = inviteUrl(request, token);
+    let emailed = false;
+    let emailError: string | undefined;
+    try {
+      await sendInviteEmail({
+        to: invite.email,
+        role: invite.role,
+        invitedBy: actor.name,
+        url,
+        expiresAt: invite.expiresAt,
+      });
+      emailed = true;
+    } catch (error) {
+      console.error(error);
+      emailError =
+        error instanceof Error ? error.message : "Could not send the invite email.";
+    }
+
     return NextResponse.json({
       invite: {
         id: invite.id,
@@ -60,7 +80,9 @@ export async function POST(request: Request) {
         role: invite.role,
         expiresAt: invite.expiresAt.toISOString(),
       },
-      url: inviteUrl(request, token),
+      url,
+      emailed,
+      emailError,
     });
   } catch (error) {
     return errorResponse(error, "Failed to create invite");

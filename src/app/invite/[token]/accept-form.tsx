@@ -1,6 +1,5 @@
 "use client";
 
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { roleLabel } from "@/lib/roles";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -48,19 +47,23 @@ export function AcceptInvite({ token }: { token: string }) {
   return (
     <div className="auth-screen">
       <div className="auth-card">
-        <div className="auth-top">
-          <img src="/hyperkidz-logo.png" alt="Hyper Kidz" className="brand-logo" />
-          <ThemeToggle />
-        </div>
-        <h1>Join the tracker</h1>
+        <img src="/hyperkidz-logo.png" alt="Hyper Kidz" className="brand-logo" />
+        <h1>Accept invite</h1>
         {loading && <p className="sub">Checking invite…</p>}
         {error && <div className="auth-error">{error}</div>}
         {preview && (
           <>
             <p className="sub">
-              {preview.invitedBy} invited <strong>{preview.email}</strong> as{" "}
-              {roleLabel(preview.role)}. Choose a name and password to finish.
+              {preview.invitedBy} invited <strong>{preview.email}</strong> to the
+              location tracker.
             </p>
+            <div className="invite-role">
+              <span>Role</span>
+              <strong className={`role-badge ${preview.role}`}>
+                {roleLabel(preview.role)}
+              </strong>
+            </div>
+            <p className="sub">Set your name and password, then accept the invite.</p>
             <form
               onSubmit={async (event) => {
                 event.preventDefault();
@@ -74,13 +77,13 @@ export function AcceptInvite({ token }: { token: string }) {
                   });
                   const data = (await res.json()) as { error?: string };
                   if (!res.ok) {
-                    setError(data.error || "Could not create the account.");
+                    setError(data.error || "Could not accept the invite.");
                     setPending(false);
                     return;
                   }
                   router.push("/login?invited=1");
                 } catch {
-                  setError("Could not create the account.");
+                  setError("Could not accept the invite.");
                   setPending(false);
                 }
               }}
@@ -111,7 +114,7 @@ export function AcceptInvite({ token }: { token: string }) {
                 />
               </div>
               <button type="submit" className="btn primary auth-submit" disabled={pending}>
-                {pending ? "Creating account…" : "Create account"}
+                {pending ? "Accepting…" : "Accept invite"}
               </button>
             </form>
           </>

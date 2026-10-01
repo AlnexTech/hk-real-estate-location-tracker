@@ -34,6 +34,18 @@ export const LOIS = [
 ];
 
 export const HEALTH = ["", "Green", "Yellow", "Red"];
+
+/** Lease-health labels. Stored values stay Green / Yellow / Red. */
+export const HEALTH_LABEL: Record<string, string> = {
+  Green: "On track",
+  Yellow: "Watch",
+  Red: "At risk",
+};
+
+export function healthLabel(value?: string | null): string {
+  if (!value) return "";
+  return HEALTH_LABEL[value] ?? value;
+}
 export const PRIOS: Priority[] = ["High", "Normal", "Back burner"];
 export const OWN = ["", "Corporate", "Franchise", "Corporate + Partner"];
 export const FORMAT = ["", "With Food Court", "Without Food Court"];
@@ -53,7 +65,7 @@ export const FIELDS: FieldDef[] = [
   ["landlord", "Landlord / Landlord Rep", "text", "full"],
   ["sec", "Status"],
   ["stage", "Stage", "select", [...STAGES]],
-  ["health", "Health", "select", HEALTH],
+  ["health", "Lease health", "select", HEALTH],
   ["priority", "Priority", "select", PRIOS],
   ["searchSince", "Search started", "date"],
   ["sec", "LOI"],
@@ -104,7 +116,7 @@ export const FOCUS: Record<
     fn: (l) => l.stage === "5 - Under Construction",
   },
   flag: {
-    label: "Red or Yellow",
+    label: "Lease at risk",
     fn: (l) => l.health === "Red" || l.health === "Yellow",
   },
   late: {

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { sendActivityNotification } from "@/lib/mail";
 import type { Actor } from "@/lib/session";
 import type { LaunchPlan, Location } from "@/lib/types";
 import { FIELDS } from "@/lib/constants";
@@ -86,4 +87,18 @@ export async function logActivity(input: {
       summary: input.summary,
     },
   });
+
+  try {
+    await sendActivityNotification({
+      actorName: input.actor.name,
+      actorEmail: input.actor.email,
+      actorRole: input.actor.role,
+      action: input.action,
+      entity: input.entity,
+      entityName: input.entityName,
+      summary: input.summary,
+    });
+  } catch (error) {
+    console.error("Activity notification failed", error);
+  }
 }

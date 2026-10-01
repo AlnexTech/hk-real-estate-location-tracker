@@ -1,6 +1,15 @@
 "use client";
 
-import { SHORT, STAGES, days, fmt, planProgress, prio, searching } from "@/lib/constants";
+import {
+  SHORT,
+  STAGES,
+  days,
+  fmt,
+  healthLabel,
+  planProgress,
+  prio,
+  searching,
+} from "@/lib/constants";
 import { useTracker } from "@/lib/store";
 import type { Location } from "@/lib/types";
 import { useState, type ReactNode } from "react";
@@ -42,7 +51,10 @@ function LocationCard({
         {p === "Back burner" && <span className="prio Back">Back burner</span>}
       </div>
       <div className="mt">
-        <span className={`dot ${loc.health || "none"}`} />
+        <span
+          className={`dot ${loc.health || "none"}`}
+          title={healthLabel(loc.health) || "Lease health not set"}
+        />
         {[loc.city, loc.state].filter(Boolean).join(", ") || "—"}
       </div>
       {sd !== null && (
@@ -130,7 +142,7 @@ export function TableView() {
             <th>Priority</th>
             <th>Days searching</th>
             <th>Stage</th>
-            <th>Health</th>
+            <th>Lease health</th>
             <th>LOI</th>
             <th>Lease Signed</th>
             <th>Target Open</th>
@@ -159,7 +171,7 @@ export function TableView() {
                 <td>{SHORT[l.stage || ""] || l.stage || ""}</td>
                 <td>
                   {l.health ? (
-                    <span className={`pill ${l.health}`}>{l.health}</span>
+                    <span className={`pill ${l.health}`}>{healthLabel(l.health)}</span>
                   ) : (
                     ""
                   )}

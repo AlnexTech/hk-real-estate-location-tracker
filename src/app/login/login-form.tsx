@@ -1,6 +1,5 @@
 "use client";
 
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
@@ -22,17 +21,14 @@ export function LoginForm() {
   return (
     <div className="auth-screen">
       <div className="auth-card">
-        <div className="auth-top">
-          <img src="/hyperkidz-logo.png" alt="Hyper Kidz" className="brand-logo" />
-          <ThemeToggle />
-        </div>
+        <img src="/hyperkidz-logo.png" alt="Hyper Kidz" className="brand-logo" />
         <h1>Sign in</h1>
         <p className="sub">
           Hyper Kidz real estate location tracker. Accounts are created from an
           admin invite.
         </p>
         {invited && (
-          <div className="auth-note">Account created. Sign in with your new password.</div>
+          <div className="auth-note">Invite accepted. Sign in with the password you just chose.</div>
         )}
         {error && <div className="auth-error">{error}</div>}
         <form
