@@ -282,7 +282,7 @@ export function LocationDrawer() {
               disabled={!canWrite}
               onClick={() =>
                 saveLocation(openId, {
-                  priority: prio(loc) === "High" ? "Normal" : "High",
+                  priority: prio(loc) === "High" ? "Medium" : "High",
                 })
               }
             >
@@ -295,7 +295,7 @@ export function LocationDrawer() {
               onClick={() =>
                 saveLocation(openId, {
                   priority:
-                    prio(loc) === "Back burner" ? "Normal" : "Back burner",
+                    prio(loc) === "Back burner" ? "Medium" : "Back burner",
                 })
               }
             >

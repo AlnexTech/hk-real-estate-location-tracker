@@ -32,8 +32,9 @@ enum Health {
 }
 
 enum Priority {
+  LOW         @map("Low")
+  MEDIUM      @map("Medium")
   HIGH        @map("High")
-  NORMAL      @map("Normal")
   BACK_BURNER @map("Back burner")
 
   @@map("priority")
@@ -112,7 +113,7 @@ model Location {
   sqft        Int?
   stage       Stage     @default(SITE_SEARCH)
   health      Health?
-  priority    Priority  @default(NORMAL)
+  priority    Priority  @default(MEDIUM)
   searchSince DateTime? @map("search_since") @db.Date
 
   loiStatus LoiStatus? @map("loi_status")

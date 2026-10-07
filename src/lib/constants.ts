@@ -46,7 +46,7 @@ export function healthLabel(value?: string | null): string {
   if (!value) return "";
   return HEALTH_LABEL[value] ?? value;
 }
-export const PRIOS: Priority[] = ["High", "Normal", "Back burner"];
+export const PRIOS: Priority[] = ["Low", "Medium", "High", "Back burner"];
 export const OWN = ["", "Corporate", "Franchise", "Corporate + Partner"];
 export const FORMAT = ["", "With Food Court", "Without Food Court"];
 export const COUNTRIES = ["USA", "Canada", "Australia"];
@@ -96,13 +96,9 @@ export const FOCUS: Record<
   { label: string; fn: (l: Location) => boolean }
 > = {
   open: { label: "Open locations", fn: (l) => l.stage === "6 - Open" },
-  pipeline: {
-    label: "In pipeline",
-    fn: (l) =>
-      !!l.stage &&
-      l.stage !== "6 - Open" &&
-      l.stage !== "Dead" &&
-      l.stage !== "On Hold",
+  sitesearch: {
+    label: "Site search",
+    fn: (l) => l.stage === "2 - Site Search",
   },
   high: {
     label: "High priority",
@@ -147,13 +143,14 @@ export function fieldsForLocation(loc: Location): FieldDef[] {
 }
 
 export function prio(l: Location): Priority {
+  if (l.priority === "Normal") return "Medium";
   return PRIOS.includes(l.priority as Priority)
     ? (l.priority as Priority)
-    : "Normal";
+    : "Medium";
 }
 
 export function prank(l: Location): number {
-  return { High: 0, Normal: 1, "Back burner": 2 }[prio(l)];
+  return { High: 0, Medium: 1, Low: 2, "Back burner": 3 }[prio(l)];
 }
 
 export function today(): string {

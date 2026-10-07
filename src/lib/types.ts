@@ -9,13 +9,13 @@ export type Stage =
   | "Dead";
 
 export type Health = "" | "Green" | "Yellow" | "Red";
-export type Priority = "High" | "Normal" | "Back burner";
+export type Priority = "Low" | "Medium" | "High" | "Back burner";
 export type TaskStatus = "Not Started" | "In Progress" | "Done" | "N/A";
 export type ViewMode = "board" | "table" | "plan";
 export type FocusKey =
   | ""
   | "open"
-  | "pipeline"
+  | "sitesearch"
   | "high"
   | "loilease"
   | "build"

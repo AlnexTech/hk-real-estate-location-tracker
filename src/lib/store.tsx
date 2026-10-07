@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -111,6 +112,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const [planLoc, setPlanLoc] = useState("");
   const [toast, setToast] = useState<string | null>(null);
+  const toastTimer = useRef<number | null>(null);
   const [dataReady, setDataReady] = useState(false);
   const { data: session, status } = useSession();
 
@@ -122,7 +124,11 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
-    window.setTimeout(() => setToast(null), 1600);
+    if (toastTimer.current) window.clearTimeout(toastTimer.current);
+    toastTimer.current = window.setTimeout(() => {
+      setToast(null);
+      toastTimer.current = null;
+    }, 3200);
   }, []);
 
   const loadTracker = useCallback(async () => {
@@ -275,7 +281,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
           }
           return [...prev, location];
         });
-        showToast("Added");
+        showToast("Location added");
         return location.id;
       } catch (error) {
         console.error(error);

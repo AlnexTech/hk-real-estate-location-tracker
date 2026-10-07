@@ -57,13 +57,17 @@ const HEALTH_TO_DB: Record<string, DbHealth> = Object.fromEntries(
 ) as Record<string, DbHealth>;
 
 const PRIORITY_TO_APP: Record<DbPriority, string> = {
+  [Priority.LOW]: "Low",
+  [Priority.MEDIUM]: "Medium",
   [Priority.HIGH]: "High",
-  [Priority.NORMAL]: "Normal",
   [Priority.BACK_BURNER]: "Back burner",
 };
-const PRIORITY_TO_DB: Record<string, DbPriority> = Object.fromEntries(
-  Object.entries(PRIORITY_TO_APP).map(([k, v]) => [v, k as DbPriority]),
-) as Record<string, DbPriority>;
+const PRIORITY_TO_DB: Record<string, DbPriority> = {
+  ...Object.fromEntries(
+    Object.entries(PRIORITY_TO_APP).map(([k, v]) => [v, k as DbPriority]),
+  ),
+  Normal: Priority.MEDIUM,
+} as Record<string, DbPriority>;
 
 const OWNERSHIP_TO_APP: Record<DbOwnership, string> = {
   [Ownership.CORPORATE]: "Corporate",
@@ -276,7 +280,7 @@ export function locationPatchToDb(
   }
   if ("priority" in patch) {
     const v = emptyToNull(patch.priority) as string | null;
-    data.priority = v ? PRIORITY_TO_DB[v] ?? Priority.NORMAL : Priority.NORMAL;
+    data.priority = v ? PRIORITY_TO_DB[v] ?? Priority.MEDIUM : Priority.MEDIUM;
   }
   if ("searchSince" in patch) data.searchSince = asDate(patch.searchSince as string);
   if ("loiStatus" in patch) {

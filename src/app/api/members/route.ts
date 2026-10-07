@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/db";
+import { isAppRole } from "@/lib/roles";
 import { errorResponse, requireAdmin } from "@/lib/session";
+import { createUserAccount } from "@/lib/users";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -28,5 +30,30 @@ export async function GET() {
     });
   } catch (error) {
     return errorResponse(error, "Failed to load members");
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const actor = await requireAdmin();
+    const body = (await request.json()) as { email?: string; role?: string };
+    const email = body.email?.trim().toLowerCase() ?? "";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return NextResponse.json(
+        { error: "Enter a valid email address" },
+        { status: 400 },
+      );
+    }
+    if (!isAppRole(body.role)) {
+      return NextResponse.json(
+        { error: "Choose Admin or Real estate agent" },
+        { status: 400 },
+      );
+    }
+
+    const created = await createUserAccount(actor, email, body.role);
+    return NextResponse.json(created);
+  } catch (error) {
+    return errorResponse(error, "Failed to create user");
   }
 }

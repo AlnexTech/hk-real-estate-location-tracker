@@ -42,8 +42,10 @@ const HEALTH_MAP: Record<string, Health> = {
 };
 
 const PRIORITY_MAP: Record<string, Priority> = {
+  Low: Priority.LOW,
+  Medium: Priority.MEDIUM,
   High: Priority.HIGH,
-  Normal: Priority.NORMAL,
+  Normal: Priority.MEDIUM,
   "Back burner": Priority.BACK_BURNER,
 };
 
@@ -118,7 +120,7 @@ async function main() {
       sqft: asInt(loc.sqft),
       stage: mapEnum(loc.stage, STAGE_MAP) ?? Stage.SITE_SEARCH,
       health: mapEnum(loc.health, HEALTH_MAP),
-      priority: mapEnum(loc.priority, PRIORITY_MAP) ?? Priority.NORMAL,
+      priority: mapEnum(loc.priority, PRIORITY_MAP) ?? Priority.MEDIUM,
       searchSince: asDate(loc.searchSince),
       loiStatus: mapEnum(loc.loiStatus, LOI_STATUS_MAP),
       loiSent: asDate(loc.loiSent),

@@ -47,8 +47,9 @@ function LocationCard({
     >
       <div className="nm">
         {loc.name || "Untitled"}{" "}
-        {p === "High" && <span className="prio High">High</span>}
-        {p === "Back burner" && <span className="prio Back">Back burner</span>}
+        {p !== "Medium" && (
+          <span className={`prio ${p === "Back burner" ? "Back" : p}`}>{p}</span>
+        )}
       </div>
       <div className="mt">
         <span
@@ -161,11 +162,9 @@ export function TableView() {
                 <td>{l.city || ""}</td>
                 <td>{l.state || ""}</td>
                 <td>
-                  {p !== "Normal" && (
-                    <span className={`prio ${p === "High" ? "High" : "Back"}`}>
-                      {p}
-                    </span>
-                  )}
+                  <span className={`prio ${p === "Back burner" ? "Back" : p}`}>
+                    {p}
+                  </span>
                 </td>
                 <td>{searching(l) !== null ? searching(l) : ""}</td>
                 <td>{SHORT[l.stage || ""] || l.stage || ""}</td>

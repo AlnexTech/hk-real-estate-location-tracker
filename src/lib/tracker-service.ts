@@ -120,7 +120,7 @@ export async function addLocation(
       stage: Stage.SITE_SEARCH,
       country: Country.USA,
       ownership: Ownership.FRANCHISE,
-      priority: Priority.NORMAL,
+      priority: Priority.MEDIUM,
       lastTouched: asDate(today()),
     },
     update: {
@@ -128,7 +128,7 @@ export async function addLocation(
       stage: Stage.SITE_SEARCH,
       country: Country.USA,
       ownership: Ownership.FRANCHISE,
-      priority: Priority.NORMAL,
+      priority: Priority.MEDIUM,
       lastTouched: asDate(today()),
     },
   });
@@ -149,7 +149,7 @@ export async function addLocation(
 
 export async function deleteLocation(id: string, actor?: Actor): Promise<void> {
   const existing = await prisma.location.findUnique({ where: { id } });
-  if (!existing) throw new Error("Location not found");
+  if (!existing) return;
   await prisma.location.delete({ where: { id } });
   if (actor) {
     await logActivity({

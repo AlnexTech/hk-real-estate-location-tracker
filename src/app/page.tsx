@@ -30,7 +30,7 @@ function TrackerApp() {
       </div>
       <Feed />
       <LocationDrawer />
-      <div className={`toast ${toast ? "show" : ""}`} role="status">
+      <div className={`toast ${toast ? "show" : ""}`} role="status" aria-live="polite">
         {toast}
       </div>
     </div>

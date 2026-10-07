@@ -6,19 +6,23 @@ export function Modal({
   open,
   onClose,
   children,
+  dismissible = true,
+  className,
 }: {
   open: boolean;
   onClose: () => void;
   children: ReactNode;
+  dismissible?: boolean;
+  className?: string;
 }) {
   useEffect(() => {
-    if (!open) return;
+    if (!open || !dismissible) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  }, [open, onClose, dismissible]);
 
   if (!open) return null;
 
@@ -26,11 +30,11 @@ export function Modal({
     <div
       className="drawer open"
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (dismissible && e.target === e.currentTarget) onClose();
       }}
       role="presentation"
     >
-      <div className="mbox" role="dialog" aria-modal="true">
+      <div className={className ? `mbox ${className}` : "mbox"} role="dialog" aria-modal="true">
         {children}
       </div>
     </div>

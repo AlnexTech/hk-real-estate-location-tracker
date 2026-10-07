@@ -1,6 +1,7 @@
 "use client";
 
 import { AdminShell } from "@/components/AdminShell";
+import { Modal } from "@/components/Modal";
 import { roleLabel } from "@/lib/roles";
 import { useCallback, useEffect, useState } from "react";
 
@@ -25,10 +26,22 @@ export function TeamView() {
   const [invites, setInvites] = useState<Invite[]>([]);
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<"admin" | "agent">("agent");
+  const [createEmail, setCreateEmail] = useState("");
+  const [createRole, setCreateRole] = useState<"admin" | "agent">("agent");
+  const [credentials, setCredentials] = useState<{
+    email: string;
+    password: string;
+    heading: string;
+    note: string;
+  } | null>(null);
+  const [resettingId, setResettingId] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState("");
   const [link, setLink] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [pending, setPending] = useState(false);
+  const [creating, setCreating] = useState(false);
 
   const load = useCallback(async () => {
     const [memberRes, inviteRes] = await Promise.all([
@@ -68,10 +81,82 @@ export function TeamView() {
   return (
     <AdminShell
       title="Team"
-      lede="Invite an admin or a real estate agent. They get an email with a link to accept the role."
+      lede="Create an account with a generated password, or send an invite link."
     >
       {error && <div className="auth-error">{error}</div>}
-      <div className="team-grid">
+      <section className="panel-card">
+        <h2>Create a user</h2>
+        <p className="sub create-user-note">
+          Enter an email. A password is generated so they can sign in right away.
+          You will see it once.
+        </p>
+        <form
+          className="invite-form"
+          onSubmit={async (event) => {
+            event.preventDefault();
+            setCreating(true);
+            setError("");
+            setNotice("");
+            try {
+              const res = await fetch("/api/members", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: createEmail, role: createRole }),
+              });
+              const data = (await res.json()) as {
+                user?: Member;
+                password?: string;
+                error?: string;
+              };
+              if (!res.ok || !data.user || !data.password) {
+                throw new Error(data.error || "Could not create the user");
+              }
+              setCredentials({
+                email: data.user.email,
+                password: data.password,
+                heading: "User created",
+                note: "Share these sign-in details. This password is shown only once.",
+              });
+              setCopied(false);
+              setCopyError("");
+              setCreateEmail("");
+              await load();
+            } catch (err) {
+              setError(err instanceof Error ? err.message : "Could not create the user");
+            } finally {
+              setCreating(false);
+            }
+          }}
+        >
+          <label>
+            Email
+            <input
+              type="email"
+              required
+              value={createEmail}
+              autoComplete="off"
+              onChange={(event) => setCreateEmail(event.target.value)}
+            />
+          </label>
+          <label>
+            Role
+            <select
+              value={createRole}
+              onChange={(event) =>
+                setCreateRole(event.target.value === "admin" ? "admin" : "agent")
+              }
+            >
+              <option value="agent">Real estate agent</option>
+              <option value="admin">Admin</option>
+            </select>
+          </label>
+          <button type="submit" className="btn primary" disabled={creating}>
+            {creating ? "Creating…" : "Create user"}
+          </button>
+        </form>
+      </section>
+
+      <div className="team-grid mt-4">
         <section className="panel-card">
           <h2>Invite someone</h2>
           <form
@@ -212,10 +297,106 @@ export function TeamView() {
               <strong>{member.name}</strong>
               <div className="sub">{member.email}</div>
             </div>
-            <span className={`role-badge ${member.role}`}>{roleLabel(member.role)}</span>
+            <div className="member-actions">
+              <span className={`role-badge ${member.role}`}>{roleLabel(member.role)}</span>
+              <button
+                type="button"
+                className="btn"
+                disabled={resettingId === member.id}
+                onClick={async () => {
+                  const confirmed = window.confirm(
+                    `Reset the password for ${member.email}? Their current password will stop working.`,
+                  );
+                  if (!confirmed) return;
+                  setResettingId(member.id);
+                  setError("");
+                  setNotice("");
+                  try {
+                    const res = await fetch(`/api/members/${member.id}/password`, {
+                      method: "POST",
+                    });
+                    const data = (await res.json()) as {
+                      email?: string;
+                      password?: string;
+                      error?: string;
+                    };
+                    if (!res.ok || !data.email || !data.password) {
+                      throw new Error(data.error || "Could not reset the password");
+                    }
+                    setCredentials({
+                      email: data.email,
+                      password: data.password,
+                      heading: "Password reset",
+                      note: "Share this new password. It replaces the old one and is shown only once.",
+                    });
+                    setCopied(false);
+                    setCopyError("");
+                  } catch (err) {
+                    setError(
+                      err instanceof Error ? err.message : "Could not reset the password",
+                    );
+                  } finally {
+                    setResettingId(null);
+                  }
+                }}
+              >
+                {resettingId === member.id ? "Resetting…" : "Reset password"}
+              </button>
+            </div>
           </article>
         ))}
       </section>
+
+      <Modal
+        open={credentials !== null}
+        dismissible={false}
+        className="credentials"
+        onClose={() => setCredentials(null)}
+      >
+        {credentials && (
+          <>
+            <h3>{credentials.heading}</h3>
+            <p className="sub">{credentials.note}</p>
+            <div className="credential-list">
+              <div>
+                <span>Email</span>
+                <strong>{credentials.email}</strong>
+              </div>
+              <div>
+                <span>Password</span>
+                <strong>{credentials.password}</strong>
+              </div>
+            </div>
+            {copyError && <div className="auth-error">{copyError}</div>}
+            <div className="mrow">
+              <button
+                type="button"
+                className="btn"
+                onClick={() => setCredentials(null)}
+              >
+                Done
+              </button>
+              <button
+                type="button"
+                className="btn primary"
+                onClick={async () => {
+                  const text = `Email: ${credentials.email}\nPassword: ${credentials.password}`;
+                  try {
+                    await navigator.clipboard.writeText(text);
+                    setCopied(true);
+                    setCopyError("");
+                  } catch {
+                    setCopied(false);
+                    setCopyError("Could not copy automatically. Select the details and copy them.");
+                  }
+                }}
+              >
+                {copied ? "Copied" : "Copy email and password"}
+              </button>
+            </div>
+          </>
+        )}
+      </Modal>
     </AdminShell>
   );
 }

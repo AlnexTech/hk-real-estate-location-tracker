@@ -3,6 +3,7 @@
 import {
   COUNTRIES,
   FOCUS,
+  PRIOS,
   days,
   daysSince,
   fmt,
@@ -125,9 +126,9 @@ export function Filters() {
         onChange={(e) => setUi({ prio: e.target.value })}
       >
         <option value="">All priorities</option>
-        <option>High</option>
-        <option>Normal</option>
-        <option>Back burner</option>
+        {PRIOS.map((p) => (
+          <option key={p}>{p}</option>
+        ))}
       </select>
       <select
         style={{ width: "auto" }}
@@ -169,12 +170,8 @@ export function Kpis() {
   const { locations, ui, setUi } = useTracker();
 
   const open = locations.filter((l) => l.stage === "6 - Open").length;
-  const pipe = locations.filter(
-    (l) =>
-      l.stage &&
-      l.stage !== "6 - Open" &&
-      l.stage !== "Dead" &&
-      l.stage !== "On Hold",
+  const siteSearch = locations.filter(
+    (l) => l.stage === "2 - Site Search",
   ).length;
   const loi = locations.filter(
     (l) => l.stage === "3 - LOI" || l.stage === "4 - Lease",
@@ -206,11 +203,11 @@ export function Kpis() {
   }[] = [
     { label: "Open", n: open, tone: "open", hot: false, focus: "open" },
     {
-      label: "In pipeline",
-      n: pipe,
-      tone: "pipeline",
+      label: "Site search",
+      n: siteSearch,
+      tone: "sitesearch",
       hot: false,
-      focus: "pipeline",
+      focus: "sitesearch",
     },
     {
       label: "High priority",

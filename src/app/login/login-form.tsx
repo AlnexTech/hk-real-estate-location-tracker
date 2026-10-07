@@ -24,8 +24,7 @@ export function LoginForm() {
         <img src="/hyperkidz-logo.png" alt="Hyper Kidz" className="brand-logo" />
         <h1>Sign in</h1>
         <p className="sub">
-          Hyper Kidz real estate location tracker. Accounts are created from an
-          admin invite.
+          Hyper Kidz real estate location tracker. An admin creates your account.
         </p>
         {invited && (
           <div className="auth-note">Invite accepted. Sign in with the password you just chose.</div>
