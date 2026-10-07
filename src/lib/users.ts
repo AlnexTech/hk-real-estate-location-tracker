@@ -128,11 +128,22 @@ export async function createUserAccount(
   };
 }
 
-export async function resetUserPassword(actor: Actor, userId: string) {
+export async function resetUserPassword(
+  actor: Actor,
+  userId: string,
+  requestedPassword: string,
+) {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) throw new HttpError(404, "Member not found");
 
-  const password = generatePassword();
+  const password = requestedPassword.trim();
+  if (password.length < 8) {
+    throw new HttpError(400, "Password must be at least 8 characters");
+  }
+  if (password.length > 72) {
+    throw new HttpError(400, "Password must be at most 72 characters");
+  }
+
   const passwordHash = await bcrypt.hash(password, 12);
   await prisma.user.update({
     where: { id: user.id },

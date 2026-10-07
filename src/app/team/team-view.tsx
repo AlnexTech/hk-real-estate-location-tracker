@@ -21,6 +21,14 @@ type Invite = {
   invitedBy: string;
 };
 
+const PASSWORD_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+
+function suggestPassword(): string {
+  const values = new Uint32Array(12);
+  crypto.getRandomValues(values);
+  return Array.from(values, (value) => PASSWORD_CHARS[value % PASSWORD_CHARS.length]).join("");
+}
+
 export function TeamView() {
   const [members, setMembers] = useState<Member[]>([]);
   const [invites, setInvites] = useState<Invite[]>([]);
@@ -35,6 +43,9 @@ export function TeamView() {
     note: string;
   } | null>(null);
   const [resettingId, setResettingId] = useState<string | null>(null);
+  const [passwordTarget, setPasswordTarget] = useState<Member | null>(null);
+  const [nextPassword, setNextPassword] = useState("");
+  const [passwordError, setPasswordError] = useState("");
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState("");
   const [link, setLink] = useState("");
@@ -302,50 +313,116 @@ export function TeamView() {
               <button
                 type="button"
                 className="btn"
-                disabled={resettingId === member.id}
-                onClick={async () => {
-                  const confirmed = window.confirm(
-                    `Reset the password for ${member.email}? Their current password will stop working.`,
-                  );
-                  if (!confirmed) return;
-                  setResettingId(member.id);
+                disabled={resettingId !== null}
+                onClick={() => {
+                  setPasswordTarget(member);
+                  setNextPassword("");
+                  setPasswordError("");
                   setError("");
-                  setNotice("");
-                  try {
-                    const res = await fetch(`/api/members/${member.id}/password`, {
-                      method: "POST",
-                    });
-                    const data = (await res.json()) as {
-                      email?: string;
-                      password?: string;
-                      error?: string;
-                    };
-                    if (!res.ok || !data.email || !data.password) {
-                      throw new Error(data.error || "Could not reset the password");
-                    }
-                    setCredentials({
-                      email: data.email,
-                      password: data.password,
-                      heading: "Password reset",
-                      note: "Share this new password. It replaces the old one and is shown only once.",
-                    });
-                    setCopied(false);
-                    setCopyError("");
-                  } catch (err) {
-                    setError(
-                      err instanceof Error ? err.message : "Could not reset the password",
-                    );
-                  } finally {
-                    setResettingId(null);
-                  }
                 }}
               >
-                {resettingId === member.id ? "Resetting…" : "Reset password"}
+                Set password
               </button>
             </div>
           </article>
         ))}
       </section>
+
+      <Modal
+        open={passwordTarget !== null}
+        onClose={() => {
+          if (resettingId) return;
+          setPasswordTarget(null);
+        }}
+      >
+        {passwordTarget && (
+          <form
+            onSubmit={async (event) => {
+              event.preventDefault();
+              const password = nextPassword.trim();
+              if (password.length < 8) {
+                setPasswordError("Password must be at least 8 characters");
+                return;
+              }
+              setResettingId(passwordTarget.id);
+              setPasswordError("");
+              setError("");
+              setNotice("");
+              try {
+                const res = await fetch(`/api/members/${passwordTarget.id}/password`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ password }),
+                });
+                const data = (await res.json()) as {
+                  email?: string;
+                  password?: string;
+                  error?: string;
+                };
+                if (!res.ok || !data.email || !data.password) {
+                  throw new Error(data.error || "Could not set the password");
+                }
+                setPasswordTarget(null);
+                setNextPassword("");
+                setCredentials({
+                  email: data.email,
+                  password: data.password,
+                  heading: "Password set",
+                  note: "Share this password. It replaces the old one and is shown only once.",
+                });
+                setCopied(false);
+                setCopyError("");
+              } catch (err) {
+                setPasswordError(
+                  err instanceof Error ? err.message : "Could not set the password",
+                );
+              } finally {
+                setResettingId(null);
+              }
+            }}
+          >
+            <h3>Set password</h3>
+            <p className="sub">
+              Choose a password for {passwordTarget.email}. It replaces the current one.
+            </p>
+            {passwordError && <div className="auth-error">{passwordError}</div>}
+            <div className="f" style={{ marginTop: 8 }}>
+              <label htmlFor="member-password">New password</label>
+              <input
+                id="member-password"
+                type="text"
+                autoComplete="off"
+                value={nextPassword}
+                onChange={(event) => setNextPassword(event.target.value)}
+              />
+            </div>
+            <div className="mrow">
+              <button
+                type="button"
+                className="btn"
+                disabled={resettingId !== null}
+                onClick={() => setPasswordTarget(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn"
+                disabled={resettingId !== null}
+                onClick={() => {
+                  setNextPassword(suggestPassword());
+                  setPasswordError("");
+                }}
+              >
+                Generate
+              </button>
+              <button type="submit" className="btn primary" disabled={resettingId !== null}>
+                {resettingId ? "Saving…" : "Set password"}
+              </button>
+            </div>
+          </form>
+        )}
+      </Modal>
 
       <Modal
         open={credentials !== null}
