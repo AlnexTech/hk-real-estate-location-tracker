@@ -67,7 +67,6 @@ export const FIELDS: FieldDef[] = [
   ["stage", "Stage", "select", [...STAGES]],
   ["health", "Lease health", "select", HEALTH],
   ["priority", "Priority", "select", PRIOS],
-  ["searchSince", "Search started", "date"],
   ["sec", "LOI"],
   ["loiStatus", "LOI Status", "select", LOIS],
   ["loiSent", "LOI Sent", "date"],
@@ -80,7 +79,9 @@ export const FIELDS: FieldDef[] = [
   ["freeRent", "Free Rent (months)", "number"],
   ["ti", "TI Allowance ($)", "number"],
   ["baseRent", "Base Rent ($/mo)", "number"],
+  ["nnn", "NNN", "number"],
   ["sec", "Franchise & Opening"],
+  ["searchSince", "Search started", "date"],
   ["fddSigned", "FDD Signed", "date"],
   ["targetOpen", "Target Open", "date"],
   ["actualOpen", "Actual Open", "date"],
@@ -132,6 +133,18 @@ export const FOCUS: Record<
     fn: (l) => searching(l) !== null,
   },
 };
+
+/** Form and report fields, with Open date added to Status for open locations. */
+export function fieldsForLocation(loc: Location): FieldDef[] {
+  const fields: FieldDef[] = [];
+  for (const field of FIELDS) {
+    fields.push(field);
+    if (field[0] === "priority" && loc.stage === "6 - Open") {
+      fields.push(["actualOpen", "Open date", "date"]);
+    }
+  }
+  return fields;
+}
 
 export function prio(l: Location): Priority {
   return PRIOS.includes(l.priority as Priority)

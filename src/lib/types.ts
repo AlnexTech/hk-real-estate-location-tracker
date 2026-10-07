@@ -48,6 +48,7 @@ export interface Location {
   freeRent?: number | string;
   ti?: number | string;
   baseRent?: number | string;
+  nnn?: number | string;
   fddSigned?: string;
   targetOpen?: string;
   actualOpen?: string;

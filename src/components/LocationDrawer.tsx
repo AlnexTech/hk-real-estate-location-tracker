@@ -1,9 +1,9 @@
 "use client";
 
 import {
-  FIELDS,
   SHORT,
   STATUS_FIELDS,
+  fieldsForLocation,
   fmt,
   healthLabel,
   prio,
@@ -68,10 +68,20 @@ function FieldInput({
     input = (
       <input
         type={type}
+        inputMode={type === "number" ? "decimal" : undefined}
+        step={type === "number" ? "any" : undefined}
         value={String(v).slice(0, type === "date" ? 10 : 999)}
         disabled={dis}
+        onKeyDown={
+          type === "number"
+            ? (e) => {
+                if (["e", "E", "+", "-"].includes(e.key)) e.preventDefault();
+              }
+            : undefined
+        }
         onChange={(e) => {
           const raw = e.target.value;
+          if (type === "number" && raw !== "" && !Number.isFinite(Number(raw))) return;
           onChange(key, type === "number" && raw !== "" ? Number(raw) : raw);
         }}
       />
@@ -323,9 +333,9 @@ export function LocationDrawer() {
           </div>
 
           <div className="field-grid">
-            {FIELDS.map((f, i) => (
+            {fieldsForLocation(loc).map((f, i) => (
               <FieldInput
-                key={f[0] === "sec" ? `sec-${f[1]}-${i}` : f[0]}
+                key={f[0] === "sec" ? `sec-${f[1]}-${i}` : `${f[0]}-${i}`}
                 def={f}
                 loc={loc}
                 canWrite={canWrite}

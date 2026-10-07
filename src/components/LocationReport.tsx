@@ -1,8 +1,8 @@
 "use client";
 
 import {
-  FIELDS,
   SHORT,
+  fieldsForLocation,
   addDays,
   days,
   fmt,
@@ -66,6 +66,15 @@ function fieldText(def: FieldDef, loc: Location): { value: string; warn: boolean
   }
   if (key === "ti") return { value: money(raw), warn: false };
   if (key === "baseRent") return { value: `${money(raw)} / mo`, warn: false };
+  if (key === "nnn") {
+    const n = Number(raw);
+    return {
+      value: Number.isFinite(n)
+        ? n.toLocaleString(undefined, { maximumFractionDigits: 2 })
+        : String(raw),
+      warn: false,
+    };
+  }
   if (key === "freeRent") return { value: `${raw} months`, warn: false };
   if (key === "drive" && /^https?:\/\//i.test(String(raw))) {
     return { value: String(raw), warn: false, href: String(raw) };
@@ -154,7 +163,7 @@ export function LocationReport({
       }[];
     }[] = [];
     let current: (typeof sections)[number] | null = null;
-    for (const def of FIELDS) {
+    for (const def of fieldsForLocation(loc)) {
       if (def[0] === "sec") {
         current = { title: def[1], rows: [] };
         sections.push(current);

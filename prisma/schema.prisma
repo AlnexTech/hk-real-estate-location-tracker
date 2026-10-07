@@ -126,6 +126,7 @@ model Location {
   freeRent      Int?      @map("free_rent")
   ti            Decimal?  @db.Decimal(12, 2)
   baseRent      Decimal?  @map("base_rent") @db.Decimal(12, 2)
+  nnn           Decimal?  @db.Decimal(12, 2)
 
   fddSigned   DateTime? @map("fdd_signed") @db.Date
   targetOpen  DateTime? @map("target_open") @db.Date

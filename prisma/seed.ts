@@ -130,6 +130,7 @@ async function main() {
       freeRent: asInt(loc.freeRent),
       ti: asDecimal(loc.ti),
       baseRent: asDecimal(loc.baseRent),
+      nnn: asDecimal(loc.nnn),
       fddSigned: asDate(loc.fddSigned),
       targetOpen: asDate(loc.targetOpen),
       actualOpen: asDate(loc.actualOpen),

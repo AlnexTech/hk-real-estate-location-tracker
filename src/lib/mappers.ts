@@ -154,6 +154,7 @@ export function locationToApp(row: DbLocation): Location {
     freeRent: row.freeRent ?? undefined,
     ti: decimalToNumber(row.ti),
     baseRent: decimalToNumber(row.baseRent),
+    nnn: decimalToNumber(row.nnn),
     fddSigned: toDateString(row.fddSigned),
     targetOpen: toDateString(row.targetOpen),
     actualOpen: toDateString(row.actualOpen),
@@ -293,6 +294,7 @@ export function locationPatchToDb(
   if ("freeRent" in patch) data.freeRent = asInt(patch.freeRent);
   if ("ti" in patch) data.ti = asDecimal(patch.ti);
   if ("baseRent" in patch) data.baseRent = asDecimal(patch.baseRent);
+  if ("nnn" in patch) data.nnn = asDecimal(patch.nnn);
   if ("fddSigned" in patch) data.fddSigned = asDate(patch.fddSigned as string);
   if ("targetOpen" in patch) data.targetOpen = asDate(patch.targetOpen as string);
   if ("actualOpen" in patch) data.actualOpen = asDate(patch.actualOpen as string);
