@@ -12,8 +12,8 @@ import {
   searching,
 } from "@/lib/constants";
 import { useTracker } from "@/lib/store";
-import type { Location } from "@/lib/types";
-import { useState, type ReactNode } from "react";
+import type { Location, Update } from "@/lib/types";
+import { useMemo, useState, type ReactNode } from "react";
 
 function LocationCard({
   loc,
@@ -129,7 +129,16 @@ export function BoardView() {
 }
 
 export function TableView() {
-  const { filtered, setOpenId } = useTracker();
+  const { filtered, updates, setOpenId } = useTracker();
+  const latestNote = useMemo(() => {
+    const map = new Map<string, Update>();
+    for (const update of updates) {
+      const current = map.get(update.locId);
+      if (!current || update.ts > current.ts) map.set(update.locId, update);
+    }
+    return map;
+  }, [updates]);
+
   if (!filtered.length) {
     return <div className="empty">No locations match.</div>;
   }
@@ -144,19 +153,17 @@ export function TableView() {
             <th>Priority</th>
             <th>Days searching</th>
             <th>Stage</th>
-            <th>Lease health</th>
+            <th>Health</th>
             <th>LOI</th>
-            <th>Lease Signed</th>
-            <th>Target Open</th>
-            <th>Actual Open</th>
+            <th>Notes</th>
             <th>Last updated by</th>
             <th>Updated at</th>
           </tr>
         </thead>
         <tbody>
           {filtered.map((l) => {
-            const d = days(l.targetOpen);
             const p = prio(l);
+            const note = latestNote.get(l.id);
             return (
               <tr key={l.id} onClick={() => setOpenId(l.id)}>
                 <td>
@@ -179,15 +186,18 @@ export function TableView() {
                   )}
                 </td>
                 <td>{l.loiStatus || ""}</td>
-                <td>{fmt(l.leaseSigned)}</td>
-                <td
-                  className={
-                    !l.actualOpen && d !== null && d < 0 ? "late" : ""
-                  }
-                >
-                  {fmt(l.targetOpen)}
+                <td className="note">
+                  {note ? (
+                    <>
+                      {note.text}
+                      <div className="who">
+                        {fmt(note.at)} · {note.by || "Someone"}
+                      </div>
+                    </>
+                  ) : (
+                    ""
+                  )}
                 </td>
-                <td>{fmt(l.actualOpen)}</td>
                 <td>{l.lastUpdatedBy || ""}</td>
                 <td>{fmtDateTime(l.updatedAt)}</td>
               </tr>

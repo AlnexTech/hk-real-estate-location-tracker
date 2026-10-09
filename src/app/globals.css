@@ -617,19 +617,23 @@ table.data th {
   font-weight: 600;
 }
 
-table.data th:nth-child(1) { width: 13%; }
+table.data th:nth-child(1) { width: 14%; }
 table.data th:nth-child(2) { width: 8%; }
-table.data th:nth-child(3) { width: 5.5%; }
-table.data th:nth-child(4) { width: 7.5%; }
+table.data th:nth-child(3) { width: 5%; }
+table.data th:nth-child(4) { width: 7%; }
 table.data th:nth-child(5) { width: 6.5%; }
 table.data th:nth-child(6) { width: 9%; }
 table.data th:nth-child(7) { width: 7.5%; }
-table.data th:nth-child(8) { width: 8%; }
-table.data th:nth-child(9) { width: 7.5%; }
-table.data th:nth-child(10) { width: 7.5%; }
-table.data th:nth-child(11) { width: 7%; }
-table.data th:nth-child(12) { width: 6.5%; }
-table.data th:nth-child(13) { width: 6.5%; }
+table.data th:nth-child(8) { width: 7%; }
+table.data th:nth-child(9) { width: 22%; }
+table.data th:nth-child(10) { width: 8%; }
+table.data th:nth-child(11) { width: 6%; }
+
+table.data td.note .who {
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 2px;
+}
 
 table.data .prio,
 table.data .pill {
