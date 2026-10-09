@@ -16,7 +16,6 @@ import {
   updateToApp,
 } from "@/lib/mappers";
 import { slug, today } from "@/lib/constants";
-import { isAdminRole } from "@/lib/roles";
 import type { Actor } from "@/lib/session";
 import type { LaunchPlan, LaunchTemplate, Location, Update } from "@/lib/types";
 import {
@@ -36,7 +35,7 @@ export type TrackerPayload = {
 
 async function lastEditorByLocation(
   updates: { locationId: string; authorName: string; createdAt: Date }[],
-): Promise<Map<string, string>> {
+): Promise<Map<string, { name: string; at: Date }>> {
   const latest = new Map<string, { name: string; at: number }>();
   const consider = (id: string, name: string, at: Date) => {
     const trimmed = name.trim();
@@ -64,7 +63,9 @@ async function lastEditorByLocation(
     if (log.entityId) consider(log.entityId, log.actorName, log.createdAt);
   }
 
-  return new Map([...latest].map(([id, value]) => [id, value.name]));
+  return new Map(
+    [...latest].map(([id, value]) => [id, { name: value.name, at: new Date(value.at) }]),
+  );
 }
 
 export async function getTrackerData(options?: {
@@ -109,7 +110,12 @@ export async function getTrackerData(options?: {
     locations: locations.map((row) => {
       const location = locationToApp(row);
       const editor = editors?.get(row.id);
-      if (editor) location.lastUpdatedBy = editor;
+      if (editor) {
+        location.lastUpdatedBy = editor.name;
+        if (editor.at.getTime() >= row.updatedAt.getTime()) {
+          location.updatedAt = editor.at.toISOString();
+        }
+      }
       return location;
     }),
     updates: updates.map((u) => updateToApp(u, u.location.name)),
@@ -155,7 +161,7 @@ export async function saveLocation(
   }
 
   const saved = locationToApp(location);
-  if (actor && isAdminRole(actor.role)) saved.lastUpdatedBy = actor.name;
+  if (actor) saved.lastUpdatedBy = actor.name;
   return { location: saved, update };
 }
 
@@ -198,7 +204,7 @@ export async function addLocation(
     });
   }
   const created = locationToApp(row);
-  if (actor && isAdminRole(actor.role)) created.lastUpdatedBy = actor.name;
+  if (actor) created.lastUpdatedBy = actor.name;
   return created;
 }
 

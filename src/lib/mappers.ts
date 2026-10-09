@@ -166,7 +166,7 @@ export function locationToApp(row: DbLocation): Location {
     notes: row.notes ?? undefined,
     drive: row.drive ?? undefined,
     lastTouched: toDateString(row.lastTouched),
-    updatedAt: toDateString(row.updatedAt),
+    updatedAt: row.updatedAt.toISOString(),
   };
 }
 

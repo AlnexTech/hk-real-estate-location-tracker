@@ -168,6 +168,22 @@ export function fmt(d?: string | null): string {
   });
 }
 
+/** Date and time for timestamps. Date-only values stay date-only. */
+export function fmtDateTime(d?: string | null): string {
+  if (!d) return "";
+  const raw = String(d);
+  if (!raw.includes("T")) return fmt(raw);
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return fmt(raw);
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 export function days(d?: string | null): number | null {
   if (!d) return null;
   const t = new Date(today());

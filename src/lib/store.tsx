@@ -13,8 +13,6 @@ import {
 import { useSession } from "next-auth/react";
 import {
   FOCUS,
-  SHORT,
-  STAGES,
   days,
   daysSince,
   prio,
@@ -64,7 +62,6 @@ interface TrackerContextValue {
   startPlan: (id: string, start: string) => Promise<void>;
   saveTemplateFromPlan: (id: string) => Promise<void>;
   resetData: () => void;
-  digest: () => string;
   alertGroups: () => AlertGroup[];
 }
 
@@ -218,7 +215,8 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
               ? {
                   ...x,
                   lastTouched: today(),
-                  ...(isAdmin ? { lastUpdatedBy: me } : {}),
+                  updatedAt: new Date().toISOString(),
+                  lastUpdatedBy: me,
                 }
               : x,
           ),
@@ -231,7 +229,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
         return false;
       }
     },
-    [canWrite, isAdmin, me, showToast],
+    [canWrite, me, showToast],
   );
 
   const saveLocation = useCallback(
@@ -243,7 +241,8 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
       const next = {
         ...patch,
         lastTouched: today(),
-        ...(isAdmin ? { lastUpdatedBy: me } : {}),
+        updatedAt: new Date().toISOString(),
+        lastUpdatedBy: me,
       };
       setLocations((prev) =>
         prev.map((l) => (l.id === id ? { ...l, ...next } : l)),
@@ -273,7 +272,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
         }
       }
     },
-    [canWrite, isAdmin, loadTracker, me, showToast],
+    [canWrite, loadTracker, me, showToast],
   );
 
   const addLocation = useCallback(
@@ -506,59 +505,6 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     return g.filter((x) => x.items.length);
   }, [locations]);
 
-  const digest = useCallback(() => {
-    const d = new Date().toLocaleDateString(undefined, {
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-    });
-    let out = `Hyper Kidz pipeline — week of ${d}\n\n`;
-    const weeklyStages = STAGES.filter((s) => s !== "6 - Open");
-    const active = locations.filter((l) => l.stage && l.stage !== "6 - Open");
-    out += `SITES NOT OPEN (${active.length})\n`;
-    if (!active.length) {
-      out += "Every site is open.\n";
-    } else {
-      weeklyStages.forEach((s) => {
-        const items = locations.filter((l) => l.stage === s);
-        if (!items.length) return;
-        out += `\n${SHORT[s]} (${items.length})\n`;
-        items
-          .slice()
-          .sort(
-            (a, b) =>
-              prank(a) - prank(b) ||
-              (searching(b) ?? -1) - (searching(a) ?? -1) ||
-              a.name.localeCompare(b.name),
-          )
-          .forEach((l) => {
-            const sd = searching(l);
-            const place = [l.city, l.state].filter(Boolean).join(", ");
-            out += `  - ${l.name}${prio(l) === "High" ? " [HIGH]" : ""}${sd !== null ? ` — searching ${sd} days` : ""}${place ? ` (${place})` : ""}\n`;
-          });
-      });
-    }
-    out += `\nALERTS\n`;
-    const gs = alertGroups();
-    if (!gs.length) out += "Nothing flagged.\n";
-    gs.forEach((g) => {
-      out += `\n${g.k} (${g.items.length}) — ${g.why}\n`;
-      g.items.forEach((l) => {
-        const sd = searching(l);
-        out += `  - ${l.name}${prio(l) === "High" ? " [HIGH]" : ""}${sd !== null ? ` — searching ${sd} days` : ""}${l.city ? ` (${l.city}, ${l.state || ""})` : ""}\n`;
-      });
-    });
-    const recent = updates.slice(0, 10);
-    if (recent.length) {
-      out += `\nRECENT UPDATES\n`;
-      recent.forEach((u) => {
-        const l = locations.find((x) => x.id === u.locId);
-        out += `  - ${l ? l.name : u.locName}: ${u.text} (${u.at})\n`;
-      });
-    }
-    return out;
-  }, [alertGroups, locations, updates]);
-
   const value: TrackerContextValue = {
     locations,
     updates,
@@ -585,7 +531,6 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     startPlan,
     saveTemplateFromPlan,
     resetData,
-    digest,
     alertGroups,
   };
 

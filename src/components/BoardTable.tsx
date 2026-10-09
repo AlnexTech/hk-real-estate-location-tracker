@@ -5,6 +5,7 @@ import {
   STAGES,
   days,
   fmt,
+  fmtDateTime,
   healthLabel,
   planProgress,
   prio,
@@ -148,6 +149,8 @@ export function TableView() {
             <th>Lease Signed</th>
             <th>Target Open</th>
             <th>Actual Open</th>
+            <th>Last updated by</th>
+            <th>Updated at</th>
           </tr>
         </thead>
         <tbody>
@@ -185,6 +188,8 @@ export function TableView() {
                   {fmt(l.targetOpen)}
                 </td>
                 <td>{fmt(l.actualOpen)}</td>
+                <td>{l.lastUpdatedBy || ""}</td>
+                <td>{fmtDateTime(l.updatedAt)}</td>
               </tr>
             );
           })}
