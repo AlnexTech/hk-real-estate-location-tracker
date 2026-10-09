@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import { createInvite } from "@/lib/invites";
 import { sendInviteEmail } from "@/lib/mail";
-import { isAppRole } from "@/lib/roles";
+import { isAppRole, isSuperAdminRole } from "@/lib/roles";
 import { errorResponse, requireAdmin } from "@/lib/session";
 import { NextResponse } from "next/server";
 
@@ -49,8 +49,14 @@ export async function POST(request: Request) {
     }
     if (!isAppRole(body.role)) {
       return NextResponse.json(
-        { error: "Choose Admin or Real estate agent" },
+        { error: "Choose a role" },
         { status: 400 },
+      );
+    }
+    if (body.role === "super_admin" && !isSuperAdminRole(actor.role)) {
+      return NextResponse.json(
+        { error: "Only a super admin can invite a super admin." },
+        { status: 403 },
       );
     }
 

@@ -4,18 +4,23 @@ import {
   COUNTRIES,
   FOCUS,
   PRIOS,
+  SHORT,
+  STAGES,
   days,
   daysSince,
   fmt,
   healthLabel,
   prio,
+  prank,
   searching,
 } from "@/lib/constants";
 import { AccountMenu } from "@/components/AccountMenu";
 import { useTracker, type AlertGroup } from "@/lib/store";
 import type { FocusKey, Location, ViewMode } from "@/lib/types";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { PromptModal } from "./Modal";
+
+const WEEKLY_STAGES = STAGES.filter((s) => s !== "6 - Open");
 
 export function Header() {
   const {
@@ -193,6 +198,8 @@ export function Kpis() {
     (l) => prio(l) === "High" && l.stage !== "6 - Open",
   ).length;
   const longest = Math.max(0, ...locations.map((l) => searching(l) || 0));
+  const total = locations.length;
+  const totalLabel = total === 1 ? "of 1 site" : `of ${total} sites`;
 
   const k: {
     label: string;
@@ -200,14 +207,23 @@ export function Kpis() {
     tone: string;
     hot: boolean;
     focus: FocusKey;
+    ofTotal: boolean;
   }[] = [
-    { label: "Open", n: open, tone: "open", hot: false, focus: "open" },
+    {
+      label: "Open",
+      n: open,
+      tone: "open",
+      hot: false,
+      focus: "open",
+      ofTotal: true,
+    },
     {
       label: "Site search",
       n: siteSearch,
       tone: "sitesearch",
       hot: false,
       focus: "sitesearch",
+      ofTotal: true,
     },
     {
       label: "High priority",
@@ -215,14 +231,23 @@ export function Kpis() {
       tone: "priority",
       hot: hi > 0,
       focus: "high",
+      ofTotal: true,
     },
-    { label: "LOI + Lease", n: loi, tone: "deal", hot: false, focus: "loilease" },
+    {
+      label: "LOI + Lease",
+      n: loi,
+      tone: "deal",
+      hot: false,
+      focus: "loilease",
+      ofTotal: true,
+    },
     {
       label: "Under construction",
       n: build,
       tone: "build",
       hot: false,
       focus: "build",
+      ofTotal: true,
     },
     {
       label: "Lease at risk",
@@ -230,6 +255,7 @@ export function Kpis() {
       tone: "risk",
       hot: atRisk > 0,
       focus: "flag",
+      ofTotal: true,
     },
     {
       label: "Target date passed",
@@ -237,6 +263,7 @@ export function Kpis() {
       tone: "late",
       hot: late > 0,
       focus: "late",
+      ofTotal: true,
     },
     {
       label: "Longest search (days)",
@@ -244,12 +271,13 @@ export function Kpis() {
       tone: "search",
       hot: longest >= 180,
       focus: "searching",
+      ofTotal: false,
     },
   ];
 
   return (
     <div className="kpi-grid">
-      {k.map(({ label, n, tone, hot, focus: f }) => (
+      {k.map(({ label, n, tone, hot, focus: f, ofTotal }) => (
         <div
           key={f}
           className={`kpi tone-${tone}${hot ? " hot" : ""}`}
@@ -277,6 +305,7 @@ export function Kpis() {
         >
           <div className="n">{n}</div>
           <div className="l">{label}</div>
+          {ofTotal && <div className="t">{totalLabel}</div>}
         </div>
       ))}
     </div>
@@ -395,7 +424,7 @@ function AlertCard({
 }
 
 export function Alerts() {
-  const { alertGroups, digest, showToast, setOpenId } = useTracker();
+  const { alertGroups, setOpenId } = useTracker();
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const groups = alertGroups();
   const actions = groups.filter((g) => !g.watch);
@@ -404,27 +433,12 @@ export function Alerts() {
   const watchCount = watch.reduce((n, g) => n + g.items.length, 0);
 
   return (
-    <section className="brief mb-4" aria-label="Needs your attention">
+    <section className="brief" aria-label="Needs your attention">
       <div className="brief-head">
         <div>
           <h2>Needs your attention</h2>
           <p className="brief-lead">{attentionLead(actionCount, watchCount)}</p>
         </div>
-        <button
-          type="button"
-          className="brief-copy"
-          onClick={async () => {
-            const t = digest();
-            try {
-              await navigator.clipboard.writeText(t);
-              showToast("Weekly summary copied");
-            } catch {
-              showToast("Copy failed");
-            }
-          }}
-        >
-          Copy weekly summary
-        </button>
       </div>
       {groups.length > 0 && (
         <div className="brief-body">
@@ -465,6 +479,119 @@ export function Alerts() {
           ))}
         </div>
       )}
+    </section>
+  );
+}
+
+function weeklyDetail(loc: Location): string | null {
+  const sd = searching(loc);
+  if (sd !== null) return sd === 1 ? "searching 1 day" : `searching ${sd} days`;
+  if (loc.targetOpen && !loc.actualOpen) {
+    const left = days(loc.targetOpen);
+    if (left !== null) {
+      if (left < 0) {
+        const n = -left;
+        return n === 1 ? "1 day past opening" : `${n} days past opening`;
+      }
+      return left === 1 ? "opens in 1 day" : `opens in ${left} days`;
+    }
+  }
+  return null;
+}
+
+function WeeklySite({
+  loc,
+  onOpen,
+}: {
+  loc: Location;
+  onOpen: (id: string) => void;
+}) {
+  const detail = weeklyDetail(loc);
+  const high = prio(loc) === "High";
+  const place = [loc.city, loc.state].filter(Boolean).join(", ");
+
+  return (
+    <button type="button" className="brief-loc" onClick={() => onOpen(loc.id)}>
+      <span className="brief-loc-name">{loc.name}</span>
+      {(high || place || detail) && (
+        <span className="brief-loc-meta">
+          {high && <span className="brief-mark">High</span>}
+          {place && <span>{place}</span>}
+          {detail && <span>{detail}</span>}
+        </span>
+      )}
+    </button>
+  );
+}
+
+export function WeeklyUpdate() {
+  const { locations, isAdmin, digest, showToast, setOpenId } = useTracker();
+
+  const groups = useMemo(() => {
+    return WEEKLY_STAGES.map((stage) => ({
+      stage,
+      label: SHORT[stage] || stage,
+      items: locations
+        .filter((l) => l.stage === stage)
+        .sort(
+          (a, b) =>
+            prank(a) - prank(b) ||
+            (searching(b) ?? -1) - (searching(a) ?? -1) ||
+            a.name.localeCompare(b.name),
+        ),
+    })).filter((g) => g.items.length > 0);
+  }, [locations]);
+
+  const total = groups.reduce((n, g) => n + g.items.length, 0);
+
+  if (!isAdmin) return null;
+
+  return (
+    <section className="brief brief-weekly" aria-label="Weekly update">
+      <div className="brief-head">
+        <div>
+          <h2>Weekly update</h2>
+          <p className="brief-lead">
+            {total === 0
+              ? "Every site is open. Nothing to include this week."
+              : total === 1
+                ? "1 site that is not open yet."
+                : `${total} sites that are not open yet.`}
+          </p>
+        </div>
+        <button
+          type="button"
+          className="brief-copy"
+          onClick={async () => {
+            const t = digest();
+            try {
+              await navigator.clipboard.writeText(t);
+              showToast("Weekly summary copied");
+            } catch {
+              showToast("Copy failed");
+            }
+          }}
+        >
+          Copy weekly summary
+        </button>
+      </div>
+      {groups.length > 0 ? (
+        <div className="weekly-scroll">
+          {groups.map((group) => (
+            <div key={group.stage} className="weekly-group">
+              <div className="weekly-group-head">
+                <h3>{group.label}</h3>
+                <span className="weekly-group-count">{group.items.length}</span>
+              </div>
+              <div className="brief-list">
+                {group.items.map((loc) => (
+                  <WeeklySite key={loc.id} loc={loc} onOpen={setOpenId} />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
     </section>
   );
 }

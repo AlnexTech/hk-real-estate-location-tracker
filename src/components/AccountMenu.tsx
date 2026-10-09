@@ -1,6 +1,6 @@
 "use client";
 
-import { roleLabel } from "@/lib/roles";
+import { isAdminRole, roleLabel } from "@/lib/roles";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -9,7 +9,7 @@ export function AccountMenu() {
   const { data } = useSession();
   const path = usePathname();
   const role = data?.user?.role;
-  const isAdmin = role === "admin";
+  const isAdmin = isAdminRole(role);
   const name = data?.user?.name || "Signed in";
   const roleText = roleLabel(role);
   const showRole = roleText.toLowerCase() !== name.trim().toLowerCase();
@@ -36,7 +36,11 @@ export function AccountMenu() {
       <div className="account-id">
         <span className="account-name">{name}</span>
         {showRole && (
-          <span className={`role-badge${isAdmin ? " admin" : ""}`}>{roleText}</span>
+          <span
+            className={`role-badge${role === "admin" || role === "super_admin" ? ` ${role}` : ""}`}
+          >
+            {roleText}
+          </span>
         )}
       </div>
       <button

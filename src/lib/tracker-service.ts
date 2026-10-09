@@ -16,9 +16,16 @@ import {
   updateToApp,
 } from "@/lib/mappers";
 import { slug, today } from "@/lib/constants";
+import { isAdminRole } from "@/lib/roles";
 import type { Actor } from "@/lib/session";
 import type { LaunchPlan, LaunchTemplate, Location, Update } from "@/lib/types";
-import { Country, Ownership, Stage, TaskStatus } from "@/generated/prisma/client";
+import {
+  ActivityAction,
+  Country,
+  Ownership,
+  Stage,
+  TaskStatus,
+} from "@/generated/prisma/client";
 
 export type TrackerPayload = {
   locations: Location[];
@@ -27,7 +34,42 @@ export type TrackerPayload = {
   template: LaunchTemplate;
 };
 
-export async function getTrackerData(): Promise<TrackerPayload> {
+async function lastEditorByLocation(
+  updates: { locationId: string; authorName: string; createdAt: Date }[],
+): Promise<Map<string, string>> {
+  const latest = new Map<string, { name: string; at: number }>();
+  const consider = (id: string, name: string, at: Date) => {
+    const trimmed = name.trim();
+    if (!id || !trimmed) return;
+    const time = at.getTime();
+    const current = latest.get(id);
+    if (!current || time >= current.at) latest.set(id, { name: trimmed, at: time });
+  };
+
+  for (const update of updates) {
+    consider(update.locationId, update.authorName, update.createdAt);
+  }
+
+  const logs = await prisma.activityLog.findMany({
+    where: {
+      entity: "location",
+      entityId: { not: null },
+      action: { in: [ActivityAction.create, ActivityAction.edit] },
+    },
+    orderBy: { createdAt: "desc" },
+    distinct: ["entityId"],
+    select: { entityId: true, actorName: true, createdAt: true },
+  });
+  for (const log of logs) {
+    if (log.entityId) consider(log.entityId, log.actorName, log.createdAt);
+  }
+
+  return new Map([...latest].map(([id, value]) => [id, value.name]));
+}
+
+export async function getTrackerData(options?: {
+  includeLastEditor?: boolean;
+}): Promise<TrackerPayload> {
   const [locations, updates, plans, template] = await Promise.all([
     prisma.location.findMany({ orderBy: { name: "asc" } }),
     prisma.locationUpdate.findMany({
@@ -59,8 +101,17 @@ export async function getTrackerData(): Promise<TrackerPayload> {
     };
   }
 
+  const editors = options?.includeLastEditor
+    ? await lastEditorByLocation(updates)
+    : null;
+
   return {
-    locations: locations.map(locationToApp),
+    locations: locations.map((row) => {
+      const location = locationToApp(row);
+      const editor = editors?.get(row.id);
+      if (editor) location.lastUpdatedBy = editor;
+      return location;
+    }),
     updates: updates.map((u) => updateToApp(u, u.location.name)),
     plans: plansByLoc,
     template: appTemplate,
@@ -103,7 +154,9 @@ export async function saveLocation(
     update = await postUpdate(id, logText, actor?.name || "You", true);
   }
 
-  return { location: locationToApp(location), update };
+  const saved = locationToApp(location);
+  if (actor && isAdminRole(actor.role)) saved.lastUpdatedBy = actor.name;
+  return { location: saved, update };
 }
 
 export async function addLocation(
@@ -144,7 +197,9 @@ export async function addLocation(
         : `Added location ${row.name}`,
     });
   }
-  return locationToApp(row);
+  const created = locationToApp(row);
+  if (actor && isAdminRole(actor.role)) created.lastUpdatedBy = actor.name;
+  return created;
 }
 
 export async function deleteLocation(id: string, actor?: Actor): Promise<void> {

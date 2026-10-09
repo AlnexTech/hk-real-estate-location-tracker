@@ -2,7 +2,10 @@
 
 import { AdminShell } from "@/components/AdminShell";
 import { Modal } from "@/components/Modal";
-import { roleLabel } from "@/lib/roles";
+import { daysSince } from "@/lib/constants";
+import { isSuperAdminRole, roleLabel } from "@/lib/roles";
+import type { AppRole } from "@/types/next-auth";
+import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useState } from "react";
 
 type Member = {
@@ -11,7 +14,31 @@ type Member = {
   email: string;
   role: string;
   createdAt: string;
+  daysSinceUpdate?: number | null;
 };
+
+function daysWithoutUpdate(member: Member): { text: string; stale: boolean } {
+  const sinceUpdate = member.daysSinceUpdate;
+  if (sinceUpdate === null || sinceUpdate === undefined) {
+    const sinceJoin = daysSince(member.createdAt) ?? 0;
+    if (sinceJoin <= 0) {
+      return { text: "Never updated location details", stale: true };
+    }
+    return {
+      text:
+        sinceJoin === 1
+          ? "1 day without a location update"
+          : `${sinceJoin} days without a location update`,
+      stale: true,
+    };
+  }
+  if (sinceUpdate <= 0) return { text: "Updated location details today", stale: false };
+  if (sinceUpdate === 1) return { text: "1 day without a location update", stale: false };
+  return {
+    text: `${sinceUpdate} days without a location update`,
+    stale: sinceUpdate >= 7,
+  };
+}
 
 type Invite = {
   id: string;
@@ -29,13 +56,22 @@ function suggestPassword(): string {
   return Array.from(values, (value) => PASSWORD_CHARS[value % PASSWORD_CHARS.length]).join("");
 }
 
+function assignableRole(value: string, allowSuperAdmin: boolean): AppRole {
+  if (value === "super_admin" && allowSuperAdmin) return "super_admin";
+  if (value === "admin") return "admin";
+  return "agent";
+}
+
 export function TeamView() {
+  const { data: session } = useSession();
+  const superAdmin = isSuperAdminRole(session?.user?.role);
+  const selfId = session?.user?.id;
   const [members, setMembers] = useState<Member[]>([]);
   const [invites, setInvites] = useState<Invite[]>([]);
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState<"admin" | "agent">("agent");
+  const [role, setRole] = useState<AppRole>("agent");
   const [createEmail, setCreateEmail] = useState("");
-  const [createRole, setCreateRole] = useState<"admin" | "agent">("agent");
+  const [createRole, setCreateRole] = useState<AppRole>("agent");
   const [credentials, setCredentials] = useState<{
     email: string;
     password: string;
@@ -44,6 +80,9 @@ export function TeamView() {
   } | null>(null);
   const [resettingId, setResettingId] = useState<string | null>(null);
   const [passwordTarget, setPasswordTarget] = useState<Member | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Member | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState("");
   const [nextPassword, setNextPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [copied, setCopied] = useState(false);
@@ -92,9 +131,14 @@ export function TeamView() {
   return (
     <AdminShell
       title="Team"
-      lede="Create an account with a generated password, or send an invite link."
+      lede={
+        superAdmin
+          ? "Create accounts, set passwords, remove users, or send an invite."
+          : "Send an invite link so someone can join the tracker."
+      }
     >
       {error && <div className="auth-error">{error}</div>}
+      {superAdmin && (
       <section className="panel-card">
         <h2>Create a user</h2>
         <p className="sub create-user-note">
@@ -154,11 +198,12 @@ export function TeamView() {
             <select
               value={createRole}
               onChange={(event) =>
-                setCreateRole(event.target.value === "admin" ? "admin" : "agent")
+                setCreateRole(assignableRole(event.target.value, true))
               }
             >
               <option value="agent">Real estate agent</option>
               <option value="admin">Admin</option>
+              <option value="super_admin">Super admin</option>
             </select>
           </label>
           <button type="submit" className="btn primary" disabled={creating}>
@@ -166,8 +211,9 @@ export function TeamView() {
           </button>
         </form>
       </section>
+      )}
 
-      <div className="team-grid mt-4">
+      <div className={`team-grid${superAdmin ? " mt-4" : ""}`}>
         <section className="panel-card">
           <h2>Invite someone</h2>
           <form
@@ -227,11 +273,12 @@ export function TeamView() {
               <select
                 value={role}
                 onChange={(event) =>
-                  setRole(event.target.value === "admin" ? "admin" : "agent")
+                  setRole(assignableRole(event.target.value, superAdmin))
                 }
               >
                 <option value="agent">Real estate agent</option>
                 <option value="admin">Admin</option>
+                {superAdmin && <option value="super_admin">Super admin</option>}
               </select>
             </label>
             <button type="submit" className="btn primary" disabled={pending}>
@@ -302,30 +349,52 @@ export function TeamView() {
 
       <section className="panel-card mt-4">
         <h2>Members</h2>
-        {members.map((member) => (
+        {members.map((member) => {
+          const gap = member.role === "agent" ? daysWithoutUpdate(member) : null;
+          return (
           <article key={member.id} className="member-row">
             <div>
               <strong>{member.name}</strong>
               <div className="sub">{member.email}</div>
+              {gap && (
+                <div className={`days-since${gap.stale ? " is-stale" : ""}`}>{gap.text}</div>
+              )}
             </div>
             <div className="member-actions">
               <span className={`role-badge ${member.role}`}>{roleLabel(member.role)}</span>
-              <button
-                type="button"
-                className="btn"
-                disabled={resettingId !== null}
-                onClick={() => {
-                  setPasswordTarget(member);
-                  setNextPassword("");
-                  setPasswordError("");
-                  setError("");
-                }}
-              >
-                Set password
-              </button>
+              {superAdmin && (
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={resettingId !== null || deletingId !== null}
+                  onClick={() => {
+                    setPasswordTarget(member);
+                    setNextPassword("");
+                    setPasswordError("");
+                    setError("");
+                  }}
+                >
+                  Set password
+                </button>
+              )}
+              {superAdmin && member.id !== selfId && (
+                <button
+                  type="button"
+                  className="btn danger"
+                  disabled={resettingId !== null || deletingId !== null}
+                  onClick={() => {
+                    setDeleteTarget(member);
+                    setDeleteError("");
+                    setError("");
+                  }}
+                >
+                  Delete
+                </button>
+              )}
             </div>
           </article>
-        ))}
+          );
+        })}
       </section>
 
       <Modal
@@ -418,6 +487,60 @@ export function TeamView() {
               </button>
               <button type="submit" className="btn primary" disabled={resettingId !== null}>
                 {resettingId ? "Saving…" : "Set password"}
+              </button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      <Modal
+        open={deleteTarget !== null}
+        onClose={() => {
+          if (deletingId) return;
+          setDeleteTarget(null);
+        }}
+      >
+        {deleteTarget && (
+          <form
+            onSubmit={async (event) => {
+              event.preventDefault();
+              setDeletingId(deleteTarget.id);
+              setDeleteError("");
+              setError("");
+              try {
+                const res = await fetch(`/api/members/${deleteTarget.id}`, {
+                  method: "DELETE",
+                });
+                const data = (await res.json().catch(() => null)) as { error?: string } | null;
+                if (!res.ok) {
+                  throw new Error(data?.error || "Could not delete the user");
+                }
+                setMembers((prev) => prev.filter((member) => member.id !== deleteTarget.id));
+                setDeleteTarget(null);
+                setNotice(`Deleted the account for ${deleteTarget.email}.`);
+              } catch (err) {
+                setDeleteError(err instanceof Error ? err.message : "Could not delete the user");
+              } finally {
+                setDeletingId(null);
+              }
+            }}
+          >
+            <h3>Delete user</h3>
+            <p className="sub">
+              Delete the account for {deleteTarget.email}. They will not be able to sign in.
+            </p>
+            {deleteError && <div className="auth-error">{deleteError}</div>}
+            <div className="mrow">
+              <button
+                type="button"
+                className="btn"
+                disabled={deletingId !== null}
+                onClick={() => setDeleteTarget(null)}
+              >
+                Cancel
+              </button>
+              <button type="submit" className="btn danger" disabled={deletingId !== null}>
+                {deletingId ? "Deleting…" : "Delete user"}
               </button>
             </div>
           </form>

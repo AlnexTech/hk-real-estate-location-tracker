@@ -87,6 +87,7 @@ enum Country {
 enum UserRole {
   admin
   agent
+  super_admin
 
   @@map("user_role")
 }

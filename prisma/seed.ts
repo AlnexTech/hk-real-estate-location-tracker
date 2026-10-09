@@ -223,10 +223,21 @@ async function main() {
           email: adminEmail,
           name: "Admin",
           passwordHash: await bcrypt.hash(adminPassword, 12),
-          role: UserRole.admin,
+          role: UserRole.super_admin,
         },
       });
-      console.log(`Created admin ${adminEmail}`);
+      console.log(`Created super admin ${adminEmail}`);
+    } else if (existingAdmin.role !== UserRole.super_admin) {
+      const superAdmins = await prisma.user.count({
+        where: { role: UserRole.super_admin },
+      });
+      if (superAdmins === 0) {
+        await prisma.user.update({
+          where: { id: existingAdmin.id },
+          data: { role: UserRole.super_admin },
+        });
+        console.log(`Promoted ${adminEmail} to super admin`);
+      }
     }
   }
 

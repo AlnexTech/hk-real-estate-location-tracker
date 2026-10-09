@@ -1,3 +1,4 @@
+import { isAdminRole } from "@/lib/roles";
 import { getToken } from "next-auth/jwt";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
@@ -52,7 +53,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(login);
   }
 
-  if (isAdminOnly(pathname) && token.role !== "admin") {
+  if (isAdminOnly(pathname) && !isAdminRole(typeof token.role === "string" ? token.role : null)) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: "Admins only" }, { status: 403 });
     }

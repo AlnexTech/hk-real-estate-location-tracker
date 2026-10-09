@@ -57,6 +57,7 @@ export interface Location {
   drive?: string;
   lastTouched?: string;
   updatedAt?: string;
+  lastUpdatedBy?: string;
 }
 
 export interface Update {

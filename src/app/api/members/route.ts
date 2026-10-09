@@ -1,6 +1,7 @@
+import { daysWithoutLocationUpdate } from "@/lib/activity";
 import { prisma } from "@/lib/db";
 import { isAppRole } from "@/lib/roles";
-import { errorResponse, requireAdmin } from "@/lib/session";
+import { errorResponse, requireAdmin, requireSuperAdmin } from "@/lib/session";
 import { createUserAccount } from "@/lib/users";
 import { NextResponse } from "next/server";
 
@@ -19,6 +20,11 @@ export async function GET() {
         createdAt: true,
       },
     });
+    const staleDays = await daysWithoutLocationUpdate(
+      users
+        .filter((user) => user.role === "agent")
+        .map((user) => ({ id: user.id, name: user.name })),
+    );
     return NextResponse.json({
       members: users.map((user) => ({
         id: user.id,
@@ -26,6 +32,7 @@ export async function GET() {
         email: user.email,
         role: user.role,
         createdAt: user.createdAt.toISOString(),
+        daysSinceUpdate: user.role === "agent" ? (staleDays.get(user.id) ?? null) : null,
       })),
     });
   } catch (error) {
@@ -35,7 +42,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const actor = await requireAdmin();
+    const actor = await requireSuperAdmin();
     const body = (await request.json()) as { email?: string; role?: string };
     const email = body.email?.trim().toLowerCase() ?? "";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -46,7 +53,7 @@ export async function POST(request: Request) {
     }
     if (!isAppRole(body.role)) {
       return NextResponse.json(
-        { error: "Choose Admin or Real estate agent" },
+        { error: "Choose Super admin, Admin, or Real estate agent" },
         { status: 400 },
       );
     }

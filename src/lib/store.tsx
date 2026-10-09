@@ -13,6 +13,8 @@ import {
 import { useSession } from "next-auth/react";
 import {
   FOCUS,
+  SHORT,
+  STAGES,
   days,
   daysSince,
   prio,
@@ -20,6 +22,7 @@ import {
   searching,
   today,
 } from "./constants";
+import { isAdminRole } from "@/lib/roles";
 import { DEFAULT_LAUNCH_TEMPLATE } from "./seed";
 import type {
   FocusKey,
@@ -116,9 +119,8 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
   const [dataReady, setDataReady] = useState(false);
   const { data: session, status } = useSession();
 
-  const isAdmin = session?.user?.role === "admin";
-  const canWrite =
-    session?.user?.role === "admin" || session?.user?.role === "agent";
+  const isAdmin = isAdminRole(session?.user?.role);
+  const canWrite = isAdmin || session?.user?.role === "agent";
   const me = session?.user?.name || "You";
   const ready = dataReady && status !== "loading";
 
@@ -212,7 +214,13 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
         setUpdates((prev) => [update, ...prev]);
         setLocations((prev) =>
           prev.map((x) =>
-            x.id === locId ? { ...x, lastTouched: today() } : x,
+            x.id === locId
+              ? {
+                  ...x,
+                  lastTouched: today(),
+                  ...(isAdmin ? { lastUpdatedBy: me } : {}),
+                }
+              : x,
           ),
         );
         if (!quiet) showToast("Update posted");
@@ -223,7 +231,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
         return false;
       }
     },
-    [canWrite, showToast],
+    [canWrite, isAdmin, me, showToast],
   );
 
   const saveLocation = useCallback(
@@ -232,7 +240,11 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
         showToast("You have view-only access");
         return;
       }
-      const next = { ...patch, lastTouched: today() };
+      const next = {
+        ...patch,
+        lastTouched: today(),
+        ...(isAdmin ? { lastUpdatedBy: me } : {}),
+      };
       setLocations((prev) =>
         prev.map((l) => (l.id === id ? { ...l, ...next } : l)),
       );
@@ -261,7 +273,7 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
         }
       }
     },
-    [canWrite, loadTracker, showToast],
+    [canWrite, isAdmin, loadTracker, me, showToast],
   );
 
   const addLocation = useCallback(
@@ -501,30 +513,31 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
       year: "numeric",
     });
     let out = `Hyper Kidz pipeline — week of ${d}\n\n`;
-    const stages = [
-      "2 - Site Search",
-      "3 - LOI",
-      "4 - Lease",
-      "5 - Under Construction",
-      "6 - Open",
-      "1 - Market (No Site)",
-      "On Hold",
-      "Dead",
-    ];
-    const SHORT: Record<string, string> = {
-      "1 - Market (No Site)": "Market",
-      "2 - Site Search": "Site Search",
-      "3 - LOI": "LOI",
-      "4 - Lease": "Lease Negotiation",
-      "5 - Under Construction": "Under Construction",
-      "6 - Open": "Open",
-      "On Hold": "On Hold",
-      Dead: "Dead",
-    };
-    stages.forEach((s) => {
-      const n = locations.filter((l) => l.stage === s).length;
-      if (n) out += `${SHORT[s]}: ${n}\n`;
-    });
+    const weeklyStages = STAGES.filter((s) => s !== "6 - Open");
+    const active = locations.filter((l) => l.stage && l.stage !== "6 - Open");
+    out += `SITES NOT OPEN (${active.length})\n`;
+    if (!active.length) {
+      out += "Every site is open.\n";
+    } else {
+      weeklyStages.forEach((s) => {
+        const items = locations.filter((l) => l.stage === s);
+        if (!items.length) return;
+        out += `\n${SHORT[s]} (${items.length})\n`;
+        items
+          .slice()
+          .sort(
+            (a, b) =>
+              prank(a) - prank(b) ||
+              (searching(b) ?? -1) - (searching(a) ?? -1) ||
+              a.name.localeCompare(b.name),
+          )
+          .forEach((l) => {
+            const sd = searching(l);
+            const place = [l.city, l.state].filter(Boolean).join(", ");
+            out += `  - ${l.name}${prio(l) === "High" ? " [HIGH]" : ""}${sd !== null ? ` — searching ${sd} days` : ""}${place ? ` (${place})` : ""}\n`;
+          });
+      });
+    }
     out += `\nALERTS\n`;
     const gs = alertGroups();
     if (!gs.length) out += "Nothing flagged.\n";

@@ -2,8 +2,9 @@ import { prisma } from "@/lib/db";
 import { sendActivityNotification } from "@/lib/mail";
 import type { Actor } from "@/lib/session";
 import type { LaunchPlan, Location } from "@/lib/types";
-import { FIELDS } from "@/lib/constants";
-import { ActivityAction, UserRole } from "@/generated/prisma/client";
+import { FIELDS, daysSince } from "@/lib/constants";
+import { ActivityAction } from "@/generated/prisma/client";
+import { toUserRole } from "@/lib/user-role";
 
 const FIELD_LABELS = new Map<string, string>([["name", "Name"]]);
 for (const field of FIELDS) {
@@ -66,6 +67,60 @@ export function summarizePlanChange(before: LaunchPlan, next: LaunchPlan): strin
   return bits.length ? `Updated the launch plan (${bits.join("; ")})` : "Updated the launch plan";
 }
 
+export async function daysWithoutLocationUpdate(
+  agents: { id: string; name: string }[],
+): Promise<Map<string, number | null>> {
+  const result = new Map<string, number | null>();
+  for (const agent of agents) result.set(agent.id, null);
+  if (agents.length === 0) return result;
+
+  const ids = agents.map((agent) => agent.id);
+  const names = [...new Set(agents.map((agent) => agent.name).filter(Boolean))];
+
+  const [logs, notes] = await Promise.all([
+    prisma.activityLog.findMany({
+      where: {
+        userId: { in: ids },
+        OR: [
+          {
+            entity: "location",
+            action: { in: [ActivityAction.create, ActivityAction.edit] },
+          },
+          { entity: "update", action: ActivityAction.create },
+        ],
+      },
+      orderBy: { createdAt: "desc" },
+      distinct: ["userId"],
+      select: { userId: true, createdAt: true },
+    }),
+    names.length
+      ? prisma.locationUpdate.findMany({
+          where: { authorName: { in: names } },
+          orderBy: { createdAt: "desc" },
+          distinct: ["authorName"],
+          select: { authorName: true, createdAt: true },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  const latestLog = new Map<string, Date>();
+  for (const log of logs) {
+    if (log.userId) latestLog.set(log.userId, log.createdAt);
+  }
+  const latestNote = new Map(notes.map((note) => [note.authorName, note.createdAt]));
+
+  for (const agent of agents) {
+    const times = [latestLog.get(agent.id), latestNote.get(agent.name)].filter(
+      (value): value is Date => value instanceof Date,
+    );
+    if (times.length === 0) continue;
+    const newest = times.reduce((left, right) => (left > right ? left : right));
+    result.set(agent.id, daysSince(newest.toISOString()) ?? 0);
+  }
+
+  return result;
+}
+
 export async function logActivity(input: {
   actor: Actor;
   action: "create" | "edit" | "delete";
@@ -79,7 +134,7 @@ export async function logActivity(input: {
       userId: input.actor.id,
       actorName: input.actor.name,
       actorEmail: input.actor.email,
-      actorRole: input.actor.role === "admin" ? UserRole.admin : UserRole.agent,
+      actorRole: toUserRole(input.actor.role),
       action: ActivityAction[input.action],
       entity: input.entity,
       entityId: input.entityId,

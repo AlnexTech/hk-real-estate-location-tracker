@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { logActivity } from "@/lib/activity";
 import { HttpError, type Actor } from "@/lib/session";
+import { rolePhrase, toUserRole } from "@/lib/user-role";
 import type { AppRole } from "@/types/next-auth";
 import { UserRole } from "@/generated/prisma/client";
 import bcrypt from "bcryptjs";
@@ -78,7 +79,7 @@ export async function createUserAccount(
 
   const password = generatePassword();
   const passwordHash = await bcrypt.hash(password, 12);
-  const userRole = role === "admin" ? UserRole.admin : UserRole.agent;
+  const userRole = toUserRole(role);
 
   let user;
   try {
@@ -110,7 +111,7 @@ export async function createUserAccount(
       entity: "user",
       entityId: user.id,
       entityName: user.email,
-      summary: `Created a ${role === "admin" ? "admin" : "real estate agent"} account for ${user.email}`,
+      summary: `Created ${role === "admin" ? "an" : "a"} ${rolePhrase(role)} account for ${user.email}`,
     });
   } catch (error) {
     console.error("Failed to record user creation", error);
@@ -164,4 +165,37 @@ export async function resetUserPassword(
   }
 
   return { email: user.email, password };
+}
+
+export async function deleteUserAccount(actor: Actor, userId: string) {
+  if (actor.id === userId) {
+    throw new HttpError(400, "You can't delete your own account.");
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new HttpError(404, "Member not found");
+
+  if (user.role === UserRole.super_admin) {
+    const superAdmins = await prisma.user.count({
+      where: { role: UserRole.super_admin },
+    });
+    if (superAdmins <= 1) {
+      throw new HttpError(400, "Keep at least one super admin.");
+    }
+  }
+
+  await prisma.user.delete({ where: { id: user.id } });
+
+  try {
+    await logActivity({
+      actor,
+      action: "delete",
+      entity: "user",
+      entityId: user.id,
+      entityName: user.email,
+      summary: `Deleted the account for ${user.email}`,
+    });
+  } catch (error) {
+    console.error("Failed to record user deletion", error);
+  }
 }

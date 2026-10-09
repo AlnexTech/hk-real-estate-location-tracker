@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import { HttpError, type Actor } from "@/lib/session";
+import { toUserRole } from "@/lib/user-role";
 import type { AppRole } from "@/types/next-auth";
-import { UserRole } from "@/generated/prisma/client";
 import bcrypt from "bcryptjs";
 import { createHash, randomBytes } from "node:crypto";
 
@@ -43,7 +43,7 @@ export async function createInvite(
   const invite = await prisma.invite.create({
     data: {
       email: normalized,
-      role: role === "admin" ? UserRole.admin : UserRole.agent,
+      role: toUserRole(role),
       tokenHash: hashInviteToken(token),
       invitedById: actor.id,
       expiresAt,

@@ -1,13 +1,20 @@
 "use client";
 
-import { Alerts, Feed, Filters, Header, Kpis } from "@/components/Header";
+import {
+  Alerts,
+  Feed,
+  Filters,
+  Header,
+  Kpis,
+  WeeklyUpdate,
+} from "@/components/Header";
 import { BoardView, TableView } from "@/components/BoardTable";
 import { LocationDrawer } from "@/components/LocationDrawer";
 import { PlanView } from "@/components/PlanView";
 import { TrackerProvider, useTracker } from "@/lib/store";
 
 function TrackerApp() {
-  const { ui, toast, hydrated } = useTracker();
+  const { ui, toast, hydrated, isAdmin } = useTracker();
 
   if (!hydrated) {
     return (
@@ -22,7 +29,10 @@ function TrackerApp() {
       <Header />
       <Filters />
       <Kpis />
-      <Alerts />
+      <div className={`briefing-row${isAdmin ? " has-weekly" : ""}`}>
+        <Alerts />
+        <WeeklyUpdate />
+      </div>
       <div id="main-view">
         {ui.view === "board" && <BoardView />}
         {ui.view === "table" && <TableView />}

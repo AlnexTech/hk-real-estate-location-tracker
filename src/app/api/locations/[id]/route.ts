@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { agentMayPatchLocation } from "@/lib/permissions";
+import { isAdminRole } from "@/lib/roles";
 import { errorResponse, requireActor, requireAdmin } from "@/lib/session";
 import { deleteLocation, saveLocation } from "@/lib/tracker-service";
 import type { Location } from "@/lib/types";
@@ -17,7 +18,7 @@ export async function PATCH(request: Request, context: Ctx) {
     if (!body.patch || typeof body.patch !== "object") {
       return NextResponse.json({ error: "patch is required" }, { status: 400 });
     }
-    if (actor.role !== "admin" && !agentMayPatchLocation(body.patch)) {
+    if (!isAdminRole(actor.role) && !agentMayPatchLocation(body.patch)) {
       return NextResponse.json(
         { error: "Only an admin can edit those fields" },
         { status: 403 },

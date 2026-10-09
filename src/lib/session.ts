@@ -1,5 +1,5 @@
 import { authOptions } from "@/lib/auth";
-import { isAppRole } from "@/lib/roles";
+import { isAdminRole, isAppRole, isSuperAdminRole } from "@/lib/roles";
 import type { AppRole } from "@/types/next-auth";
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
@@ -36,8 +36,16 @@ export async function requireActor(): Promise<Actor> {
 
 export async function requireAdmin(): Promise<Actor> {
   const actor = await requireActor();
-  if (actor.role !== "admin") {
+  if (!isAdminRole(actor.role)) {
     throw new HttpError(403, "Admins only");
+  }
+  return actor;
+}
+
+export async function requireSuperAdmin(): Promise<Actor> {
+  const actor = await requireActor();
+  if (!isSuperAdminRole(actor.role)) {
+    throw new HttpError(403, "Super admins only");
   }
   return actor;
 }

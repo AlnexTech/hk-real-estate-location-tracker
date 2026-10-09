@@ -20,6 +20,8 @@ export function ActivityView() {
   const [members, setMembers] = useState<Member[]>([]);
   const [logs, setLogs] = useState<Log[]>([]);
   const [userId, setUserId] = useState("");
+  const [role, setRole] = useState("");
+  const [sort, setSort] = useState("newest");
   const [action, setAction] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -50,6 +52,8 @@ export function ActivityView() {
       try {
         const params = new URLSearchParams();
         if (userId) params.set("userId", userId);
+        if (role) params.set("role", role);
+        if (sort === "oldest") params.set("sort", "oldest");
         if (action) params.set("action", action);
         const res = await fetch(`/api/activity?${params.toString()}`);
         const data = (await res.json()) as { logs?: Log[]; error?: string };
@@ -69,7 +73,11 @@ export function ActivityView() {
     return () => {
       cancelled = true;
     };
-  }, [userId, action]);
+  }, [userId, role, sort, action]);
+
+  const visibleMembers = role
+    ? members.filter((member) => member.role === role)
+    : members;
 
   return (
     <AdminShell
@@ -79,14 +87,41 @@ export function ActivityView() {
       <div className="panel-card mb-4">
         <div className="filter-row">
           <label>
-            Person
+            User
             <select value={userId} onChange={(event) => setUserId(event.target.value)}>
               <option value="">Everyone</option>
-              {members.map((member) => (
+              {visibleMembers.map((member) => (
                 <option key={member.id} value={member.id}>
                   {member.name} · {roleLabel(member.role)}
                 </option>
               ))}
+            </select>
+          </label>
+          <label>
+            Role
+            <select
+              value={role}
+              onChange={(event) => {
+                const next = event.target.value;
+                setRole(next);
+                if (!next) return;
+                setUserId((current) => {
+                  const member = members.find((item) => item.id === current);
+                  return member && member.role !== next ? "" : current;
+                });
+              }}
+            >
+              <option value="">All roles</option>
+              <option value="super_admin">Super admin</option>
+              <option value="admin">Admin</option>
+              <option value="agent">Real estate agent</option>
+            </select>
+          </label>
+          <label>
+            Sort
+            <select value={sort} onChange={(event) => setSort(event.target.value)}>
+              <option value="newest">Last update, newest</option>
+              <option value="oldest">Last update, oldest</option>
             </select>
           </label>
           <label>

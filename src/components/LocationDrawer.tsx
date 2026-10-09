@@ -352,6 +352,19 @@ export function LocationDrawer() {
                 onChange={(e) => setUpText(e.target.value)}
               />
             </div>
+            {isAdmin && (
+              <div className="f full">
+                <p className="last-editor">
+                  {loc.lastUpdatedBy ? (
+                    <>
+                      Last updated by <strong>{loc.lastUpdatedBy}</strong>
+                    </>
+                  ) : (
+                    "Not updated yet"
+                  )}
+                </p>
+              </div>
+            )}
             <div className="f full">
               <button
                 type="button"
