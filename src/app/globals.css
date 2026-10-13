@@ -1128,6 +1128,14 @@ table.data tbody tr:hover {
   padding: 7px 11px;
 }
 
+.agent-fields {
+  margin-top: 16px;
+}
+
+.agent-fields .sec {
+  margin-top: 0;
+}
+
 .last-editor {
   margin: 0;
   font-size: 13px;

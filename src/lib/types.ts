@@ -37,6 +37,9 @@ export interface Location {
   stage?: Stage | string;
   health?: Health | string;
   priority?: Priority | string;
+  agentName?: string;
+  agentEmail?: string;
+  agentPhone?: string;
   searchSince?: string;
   loiStatus?: string;
   loiSent?: string;

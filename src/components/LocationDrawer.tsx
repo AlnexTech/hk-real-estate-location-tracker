@@ -89,7 +89,11 @@ function FieldInput({
   } else {
     input = (
       <input
-        type="text"
+        type={key === "agentEmail" ? "email" : key === "agentPhone" ? "tel" : "text"}
+        inputMode={key === "agentPhone" ? "tel" : undefined}
+        autoComplete={
+          key === "agentEmail" ? "email" : key === "agentPhone" ? "tel" : undefined
+        }
         defaultValue={String(v)}
         key={`${loc.id}-${key}-${String(v)}`}
         disabled={dis}
@@ -105,6 +109,15 @@ function FieldInput({
       <label>{label}</label>
       {input}
     </div>
+  );
+}
+
+function isAssignedAgentField(def: FieldDef) {
+  return (
+    def[0] === "agentName" ||
+    def[0] === "agentEmail" ||
+    def[0] === "agentPhone" ||
+    (def[0] === "sec" && def[1] === "Assigned agent")
   );
 }
 
@@ -332,8 +345,25 @@ export function LocationDrawer() {
             )}
           </div>
 
+          <div className="field-grid agent-fields">
+            {fieldsForLocation(loc)
+              .filter(isAssignedAgentField)
+              .map((f, i) => (
+                <FieldInput
+                  key={f[0] === "sec" ? `agent-sec-${i}` : `agent-${f[0]}`}
+                  def={f}
+                  loc={loc}
+                  canWrite={canWrite}
+                  isAdmin={isAdmin}
+                  onChange={onField}
+                />
+              ))}
+          </div>
+
           <div className="field-grid">
-            {fieldsForLocation(loc).map((f, i) => (
+            {fieldsForLocation(loc)
+              .filter((f) => !isAssignedAgentField(f))
+              .map((f, i) => (
               <FieldInput
                 key={f[0] === "sec" ? `sec-${f[1]}-${i}` : `${f[0]}-${i}`}
                 def={f}

@@ -115,6 +115,9 @@ model Location {
   stage       Stage     @default(SITE_SEARCH)
   health      Health?
   priority    Priority  @default(MEDIUM)
+  agentName   String?   @map("agent_name")
+  agentEmail  String?   @map("agent_email")
+  agentPhone  String?   @map("agent_phone")
   searchSince DateTime? @map("search_since") @db.Date
 
   loiStatus LoiStatus? @map("loi_status")

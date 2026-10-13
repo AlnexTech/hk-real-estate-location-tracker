@@ -147,6 +147,9 @@ export function locationToApp(row: DbLocation): Location {
     stage: STAGE_TO_APP[row.stage],
     health: row.health ? HEALTH_TO_APP[row.health] : "",
     priority: PRIORITY_TO_APP[row.priority],
+    agentName: row.agentName ?? undefined,
+    agentEmail: row.agentEmail ?? undefined,
+    agentPhone: row.agentPhone ?? undefined,
     searchSince: toDateString(row.searchSince),
     loiStatus: row.loiStatus ? LOI_TO_APP[row.loiStatus] : "",
     loiSent: toDateString(row.loiSent),
@@ -282,6 +285,9 @@ export function locationPatchToDb(
     const v = emptyToNull(patch.priority) as string | null;
     data.priority = v ? PRIORITY_TO_DB[v] ?? Priority.MEDIUM : Priority.MEDIUM;
   }
+  if ("agentName" in patch) data.agentName = emptyToNull(patch.agentName);
+  if ("agentEmail" in patch) data.agentEmail = emptyToNull(patch.agentEmail);
+  if ("agentPhone" in patch) data.agentPhone = emptyToNull(patch.agentPhone);
   if ("searchSince" in patch) data.searchSince = asDate(patch.searchSince as string);
   if ("loiStatus" in patch) {
     const v = emptyToNull(patch.loiStatus) as string | null;

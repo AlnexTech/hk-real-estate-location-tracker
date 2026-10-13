@@ -79,6 +79,13 @@ function fieldText(def: FieldDef, loc: Location): { value: string; warn: boolean
   if (key === "drive" && /^https?:\/\//i.test(String(raw))) {
     return { value: String(raw), warn: false, href: String(raw) };
   }
+  if (key === "agentEmail") {
+    return { value: String(raw), warn: false, href: `mailto:${String(raw).trim()}` };
+  }
+  if (key === "agentPhone") {
+    const dial = String(raw).replace(/[^\d+]/g, "");
+    return { value: String(raw), warn: false, href: dial ? `tel:${dial}` : undefined };
+  }
   if (key === "health") return { value: healthLabel(String(raw)), warn: false };
   return { value: String(raw), warn: false };
 }
