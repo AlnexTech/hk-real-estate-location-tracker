@@ -6,6 +6,7 @@ import {
   SEED_LOCATIONS,
   SEED_UPDATES,
 } from "../src/lib/seed";
+import { LAUNCH_TEMPLATE_SOURCE_KEY } from "../src/lib/launch-template-data";
 import {
   Country,
   Format,
@@ -170,8 +171,14 @@ async function main() {
     });
   }
 
-  let template = await prisma.launchTemplate.findFirst({
-    where: { isDefault: true },
+  // Upsert spreadsheet template by sourceKey; do not touch launch_plans.
+  // Clear every default first (NULL source_key rows are not matched by `not:`).
+  await prisma.launchTemplate.updateMany({
+    data: { isDefault: false },
+  });
+
+  let template = await prisma.launchTemplate.findUnique({
+    where: { sourceKey: LAUNCH_TEMPLATE_SOURCE_KEY },
   });
 
   if (!template) {
@@ -179,6 +186,8 @@ async function main() {
       data: {
         name: DEFAULT_LAUNCH_TEMPLATE.name,
         days: DEFAULT_LAUNCH_TEMPLATE.days,
+        version: DEFAULT_LAUNCH_TEMPLATE.version,
+        sourceKey: LAUNCH_TEMPLATE_SOURCE_KEY,
         isDefault: true,
       },
     });
@@ -188,6 +197,7 @@ async function main() {
       data: {
         name: DEFAULT_LAUNCH_TEMPLATE.name,
         days: DEFAULT_LAUNCH_TEMPLATE.days,
+        version: DEFAULT_LAUNCH_TEMPLATE.version,
         isDefault: true,
       },
     });
@@ -202,10 +212,14 @@ async function main() {
       templateId: template!.id,
       tid: task.tid,
       phase: task.phase,
+      phaseOrder: task.phaseOrder ?? 0,
       task: task.task,
       owner: task.owner,
+      primaryContact: task.primaryContact || "",
+      secondaryContact: task.secondaryContact || "",
       startOffset: task.s,
       endOffset: task.e,
+      duration: task.duration ?? task.e - task.s + 1,
       critical: task.crit,
       sortOrder: index,
     })),

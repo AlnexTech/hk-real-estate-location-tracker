@@ -70,6 +70,7 @@ enum LoiStatus {
 enum TaskStatus {
   NOT_STARTED @map("Not Started")
   IN_PROGRESS @map("In Progress")
+  BLOCKED     @map("Blocked")
   DONE        @map("Done")
   N_A         @map("N/A")
 
@@ -173,6 +174,8 @@ model LaunchTemplate {
   id        String   @id @default(cuid())
   name      String
   days      Int      @default(270)
+  version   Int      @default(1)
+  sourceKey String?  @unique @map("source_key")
   isDefault Boolean  @default(false) @map("is_default")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -184,16 +187,20 @@ model LaunchTemplate {
 }
 
 model LaunchTemplateTask {
-  id          String  @id @default(cuid())
-  templateId  String  @map("template_id")
-  tid         String
-  phase       String
-  task        String
-  owner       String  @default("")
-  startOffset Int     @map("start_day")
-  endOffset   Int     @map("end_day")
-  critical    Boolean @default(false)
-  sortOrder   Int     @default(0) @map("sort_order")
+  id              String  @id @default(cuid())
+  templateId      String  @map("template_id")
+  tid             String
+  phase           String
+  phaseOrder      Int     @default(0) @map("phase_order")
+  task            String
+  owner           String  @default("")
+  primaryContact  String  @default("") @map("primary_contact")
+  secondaryContact String @default("") @map("secondary_contact")
+  startOffset     Int     @map("start_day")
+  endOffset       Int     @map("end_day")
+  duration        Int     @default(1)
+  critical        Boolean @default(false)
+  sortOrder       Int     @default(0) @map("sort_order")
 
   template LaunchTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
 
@@ -203,12 +210,13 @@ model LaunchTemplateTask {
 }
 
 model LaunchPlan {
-  id         String   @id @default(cuid())
-  locationId String   @unique @map("location_id")
-  templateId String?  @map("template_id")
-  start      DateTime @db.Date
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  id          String   @id @default(cuid())
+  locationId  String   @unique @map("location_id")
+  templateId  String?  @map("template_id")
+  start       DateTime @db.Date
+  openingDate DateTime @map("opening_date") @db.Date
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   location Location            @relation(fields: [locationId], references: [id], onDelete: Cascade)
   template LaunchTemplate?     @relation(fields: [templateId], references: [id])
@@ -218,17 +226,26 @@ model LaunchPlan {
 }
 
 model LaunchPlanTask {
-  id          String     @id @default(cuid())
-  planId      String     @map("plan_id")
-  tid         String
-  phase       String
-  task        String
-  owner       String     @default("")
-  startOffset Int        @map("start_day")
-  endOffset   Int        @map("end_day")
-  critical    Boolean    @default(false)
-  status      TaskStatus @default(NOT_STARTED)
-  sortOrder   Int        @default(0) @map("sort_order")
+  id               String     @id @default(cuid())
+  planId           String     @map("plan_id")
+  tid              String
+  phase            String
+  phaseOrder       Int        @default(0) @map("phase_order")
+  task             String
+  owner            String     @default("")
+  primaryContact   String     @default("") @map("primary_contact")
+  secondaryContact String     @default("") @map("secondary_contact")
+  startOffset      Int        @map("start_day")
+  endOffset        Int        @map("end_day")
+  duration         Int        @default(1)
+  plannedStart     DateTime   @map("planned_start") @db.Date
+  plannedEnd       DateTime   @map("planned_end") @db.Date
+  actualStart      DateTime?  @map("actual_start") @db.Date
+  actualFinish     DateTime?  @map("actual_finish") @db.Date
+  notes            String?
+  critical         Boolean    @default(false)
+  status           TaskStatus @default(NOT_STARTED)
+  sortOrder        Int        @default(0) @map("sort_order")
 
   plan LaunchPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
 

@@ -352,7 +352,9 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
         showToast("Saved");
       } catch (error) {
         console.error(error);
-        showToast("Failed to save plan");
+        showToast(
+          error instanceof Error ? error.message : "Failed to save plan",
+        );
         try {
           await loadTracker();
         } catch {
@@ -365,8 +367,8 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
 
   const startPlan = useCallback(
     async (id: string, start: string) => {
-      if (!canWrite) {
-        showToast("You have view-only access");
+      if (!isAdmin) {
+        showToast("Only an admin can start a launch plan");
         return;
       }
       try {
@@ -378,13 +380,19 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
           },
         );
         setPlans((prev) => ({ ...prev, [id]: plan }));
-        showToast("Plan started");
+        showToast(
+          plan.openingDate
+            ? `Plan started · opening ${plan.openingDate}`
+            : "Plan started",
+        );
       } catch (error) {
         console.error(error);
-        showToast("Failed to start plan");
+        showToast(
+          error instanceof Error ? error.message : "Failed to start plan",
+        );
       }
     },
-    [canWrite, showToast],
+    [isAdmin, showToast],
   );
 
   const saveTemplateFromPlan = useCallback(

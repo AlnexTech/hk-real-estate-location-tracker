@@ -10,7 +10,12 @@ export type Stage =
 
 export type Health = "" | "Green" | "Yellow" | "Red";
 export type Priority = "Low" | "Medium" | "High" | "Back burner";
-export type TaskStatus = "Not Started" | "In Progress" | "Done" | "N/A";
+export type TaskStatus =
+  | "Not Started"
+  | "In Progress"
+  | "Blocked"
+  | "Done"
+  | "N/A";
 export type ViewMode = "board" | "table" | "plan";
 export type FocusKey =
   | ""
@@ -76,23 +81,38 @@ export interface Update {
 export interface PlanTask {
   tid: string;
   phase: string;
+  phaseOrder?: number;
   task: string;
   owner: string;
+  primaryContact?: string;
+  secondaryContact?: string;
   s: number;
   e: number;
+  duration?: number;
+  plannedStart?: string;
+  plannedEnd?: string;
+  actualStart?: string;
+  actualFinish?: string;
+  notes?: string;
   crit: boolean;
   status?: TaskStatus;
 }
 
 export interface LaunchPlan {
   start: string;
+  openingDate: string;
   tasks: PlanTask[];
 }
 
 export interface LaunchTemplate {
   name: string;
   days: number;
-  tasks: Omit<PlanTask, "status">[];
+  version?: number;
+  sourceKey?: string;
+  tasks: Omit<
+    PlanTask,
+    "status" | "plannedStart" | "plannedEnd" | "actualStart" | "actualFinish" | "notes"
+  >[];
 }
 
 export interface UiState {

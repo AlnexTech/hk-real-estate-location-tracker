@@ -43,10 +43,12 @@ export function summarizeLocationPatch(
 export function summarizePlanChange(before: LaunchPlan, next: LaunchPlan): string {
   const bits: string[] = [];
   if (!same(before.start, next.start)) {
-    bits.push(`start ${show(before.start)} → ${show(next.start)}`);
+    bits.push(`Day 0 ${show(before.start)} → ${show(next.start)}`);
   }
   const previous = new Map(before.tasks.map((task) => [task.tid, task]));
   let statusChanges = 0;
+  let dateChanges = 0;
+  let contactChanges = 0;
   let added = 0;
   for (const task of next.tasks) {
     const prior = previous.get(task.tid);
@@ -55,6 +57,18 @@ export function summarizePlanChange(before: LaunchPlan, next: LaunchPlan): strin
       continue;
     }
     if (!same(prior.status, task.status)) statusChanges += 1;
+    if (
+      !same(prior.plannedStart, task.plannedStart) ||
+      !same(prior.plannedEnd, task.plannedEnd)
+    ) {
+      dateChanges += 1;
+    }
+    if (
+      !same(prior.primaryContact, task.primaryContact) ||
+      !same(prior.secondaryContact, task.secondaryContact)
+    ) {
+      contactChanges += 1;
+    }
   }
   if (added) bits.push(added === 1 ? "1 task added" : `${added} tasks added`);
   if (statusChanges) {
@@ -62,6 +76,20 @@ export function summarizePlanChange(before: LaunchPlan, next: LaunchPlan): strin
       statusChanges === 1
         ? "1 task status change"
         : `${statusChanges} task status changes`,
+    );
+  }
+  if (dateChanges) {
+    bits.push(
+      dateChanges === 1
+        ? "1 task date change"
+        : `${dateChanges} task date changes`,
+    );
+  }
+  if (contactChanges) {
+    bits.push(
+      contactChanges === 1
+        ? "1 contact change"
+        : `${contactChanges} contact changes`,
     );
   }
   return bits.length ? `Updated the launch plan (${bits.join("; ")})` : "Updated the launch plan";

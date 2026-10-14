@@ -102,6 +102,7 @@ const LOI_TO_DB: Record<string, DbLoiStatus> = Object.fromEntries(
 const TASK_TO_APP: Record<DbTaskStatus, string> = {
   [TaskStatus.NOT_STARTED]: "Not Started",
   [TaskStatus.IN_PROGRESS]: "In Progress",
+  [TaskStatus.BLOCKED]: "Blocked",
   [TaskStatus.DONE]: "Done",
   [TaskStatus.N_A]: "N/A",
 };
@@ -191,17 +192,29 @@ export function updateToApp(
 export function planTaskToApp(row: DbPlanTask | DbTemplateTask): PlanTask {
   const status =
     "status" in row && row.status ? TASK_TO_APP[row.status] : undefined;
+  const isPlanTask = "plannedStart" in row;
   return {
     tid: row.tid,
     phase: row.phase,
+    phaseOrder: row.phaseOrder ?? 0,
     task: row.task,
     owner: row.owner,
+    primaryContact: row.primaryContact ?? "",
+    secondaryContact: row.secondaryContact ?? "",
     s: row.startOffset,
     e: row.endOffset,
+    duration: row.duration ?? row.endOffset - row.startOffset + 1,
     crit: row.critical,
-    ...(status
-      ? { status: status as PlanTask["status"] }
+    ...(isPlanTask
+      ? {
+          plannedStart: toDateString((row as DbPlanTask).plannedStart),
+          plannedEnd: toDateString((row as DbPlanTask).plannedEnd),
+          actualStart: toDateString((row as DbPlanTask).actualStart) || "",
+          actualFinish: toDateString((row as DbPlanTask).actualFinish) || "",
+          notes: (row as DbPlanTask).notes ?? "",
+        }
       : {}),
+    ...(status ? { status: status as PlanTask["status"] } : {}),
   };
 }
 
@@ -210,6 +223,7 @@ export function planToApp(
 ): LaunchPlan {
   return {
     start: toDateString(row.start)!,
+    openingDate: toDateString(row.openingDate)!,
     tasks: [...row.tasks]
       .sort((a, b) => a.sortOrder - b.sortOrder)
       .map(planTaskToApp),
@@ -222,10 +236,20 @@ export function templateToApp(
   return {
     name: row.name,
     days: row.days,
+    version: row.version,
+    sourceKey: row.sourceKey ?? undefined,
     tasks: [...row.tasks]
       .sort((a, b) => a.sortOrder - b.sortOrder)
       .map((t) => {
-        const { status: _s, ...rest } = planTaskToApp(t);
+        const {
+          status: _s,
+          plannedStart: _ps,
+          plannedEnd: _pe,
+          actualStart: _as,
+          actualFinish: _af,
+          notes: _n,
+          ...rest
+        } = planTaskToApp(t);
         return rest;
       }),
   };
@@ -321,10 +345,19 @@ export function planTasksToDb(tasks: PlanTask[]) {
   return tasks.map((task, index) => ({
     tid: task.tid,
     phase: task.phase,
+    phaseOrder: task.phaseOrder ?? 0,
     task: task.task,
     owner: task.owner || "",
+    primaryContact: task.primaryContact || "",
+    secondaryContact: task.secondaryContact || "",
     startOffset: task.s,
     endOffset: task.e,
+    duration: task.duration ?? task.e - task.s + 1,
+    plannedStart: asDate(task.plannedStart)!,
+    plannedEnd: asDate(task.plannedEnd)!,
+    actualStart: asDate(task.actualStart || null),
+    actualFinish: asDate(task.actualFinish || null),
+    notes: task.notes?.trim() ? task.notes : null,
     critical: !!task.crit,
     status: task.status
       ? TASK_TO_DB[task.status] ?? TaskStatus.NOT_STARTED
@@ -333,14 +366,28 @@ export function planTasksToDb(tasks: PlanTask[]) {
   }));
 }
 
-export function templateTasksToDb(tasks: Omit<PlanTask, "status">[]) {
+export function templateTasksToDb(
+  tasks: Omit<
+    PlanTask,
+    | "status"
+    | "plannedStart"
+    | "plannedEnd"
+    | "actualStart"
+    | "actualFinish"
+    | "notes"
+  >[],
+) {
   return tasks.map((task, index) => ({
     tid: task.tid,
     phase: task.phase,
+    phaseOrder: task.phaseOrder ?? 0,
     task: task.task,
     owner: task.owner || "",
+    primaryContact: task.primaryContact || "",
+    secondaryContact: task.secondaryContact || "",
     startOffset: task.s,
     endOffset: task.e,
+    duration: task.duration ?? task.e - task.s + 1,
     critical: !!task.crit,
     sortOrder: index,
   }));

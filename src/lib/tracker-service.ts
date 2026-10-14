@@ -16,7 +16,15 @@ import {
   updateToApp,
 } from "@/lib/mappers";
 import { slug, today } from "@/lib/constants";
-import type { Actor } from "@/lib/session";
+import {
+  materializeTaskDates,
+  openingDateFromDay0,
+} from "@/lib/launch-schedule";
+import {
+  assertPlanSaveAllowed,
+  mayStartLaunchPlan,
+} from "@/lib/permissions";
+import { HttpError, type Actor } from "@/lib/session";
 import type { LaunchPlan, LaunchTemplate, Location, Update } from "@/lib/types";
 import {
   ActivityAction,
@@ -95,11 +103,8 @@ export async function getTrackerData(options?: {
   if (template) {
     appTemplate = templateToApp(template);
   } else {
-    appTemplate = {
-      name: "270-Day Launch Plan",
-      days: 270,
-      tasks: [],
-    };
+    const { DEFAULT_LAUNCH_TEMPLATE } = await import("@/lib/launch-template-data");
+    appTemplate = DEFAULT_LAUNCH_TEMPLATE;
   }
 
   const editors = options?.includeLastEditor
@@ -281,13 +286,31 @@ export async function savePlan(
     throw new Error("Plan not found. Start a plan first.");
   }
 
+  const before = planToApp(existing);
+  // Opening date is locked after creation; always persist the stored value.
+  const nextPlan: LaunchPlan = {
+    ...plan,
+    start: before.start,
+    openingDate: before.openingDate,
+  };
+
+  if (actor) {
+    try {
+      assertPlanSaveAllowed(actor.role, before, nextPlan);
+    } catch (error) {
+      throw new HttpError(
+        403,
+        error instanceof Error ? error.message : "Not allowed",
+      );
+    }
+  }
+
   await prisma.launchPlanTask.deleteMany({ where: { planId: existing.id } });
   await prisma.launchPlan.update({
     where: { id: existing.id },
     data: {
-      start: asDate(plan.start)!,
       tasks: {
-        create: planTasksToDb(plan.tasks),
+        create: planTasksToDb(nextPlan.tasks),
       },
     },
   });
@@ -303,7 +326,7 @@ export async function savePlan(
       entity: "launch_plan",
       entityId: locationId,
       entityName: existing.location.name,
-      summary: summarizePlanChange(planToApp(existing), plan),
+      summary: summarizePlanChange(before, nextPlan),
     });
   }
   return planToApp(updated);
@@ -314,11 +337,27 @@ export async function startPlan(
   start: string,
   actor?: Actor,
 ): Promise<LaunchPlan> {
-  const template = await prisma.launchTemplate.findFirst({
-    where: { isDefault: true },
+  if (actor && !mayStartLaunchPlan(actor.role)) {
+    throw new HttpError(403, "Only admins can start a launch plan");
+  }
+
+  const { LAUNCH_TEMPLATE_SOURCE_KEY } = await import(
+    "@/lib/launch-template-data"
+  );
+  let template = await prisma.launchTemplate.findFirst({
+    where: { sourceKey: LAUNCH_TEMPLATE_SOURCE_KEY },
     include: { tasks: true },
   });
+  if (!template) {
+    template = await prisma.launchTemplate.findFirst({
+      where: { isDefault: true },
+      orderBy: [{ version: "desc" }, { updatedAt: "desc" }],
+      include: { tasks: true },
+    });
+  }
   if (!template) throw new Error("No default launch template found");
+
+  const openingDate = openingDateFromDay0(start);
 
   await prisma.launchPlan.deleteMany({ where: { locationId } });
 
@@ -327,20 +366,34 @@ export async function startPlan(
       locationId,
       templateId: template.id,
       start: asDate(start)!,
+      openingDate: asDate(openingDate)!,
       tasks: {
         create: template.tasks
           .sort((a, b) => a.sortOrder - b.sortOrder)
-          .map((t, index) => ({
-            tid: t.tid,
-            phase: t.phase,
-            task: t.task,
-            owner: t.owner,
-            startOffset: t.startOffset,
-            endOffset: t.endOffset,
-            critical: t.critical,
-            sortOrder: index,
-            status: TaskStatus.NOT_STARTED,
-          })),
+          .map((t, index) => {
+            const dates = materializeTaskDates(start, {
+              s: t.startOffset,
+              e: t.endOffset,
+              duration: t.duration,
+            });
+            return {
+              tid: t.tid,
+              phase: t.phase,
+              phaseOrder: t.phaseOrder,
+              task: t.task,
+              owner: t.owner,
+              primaryContact: t.primaryContact,
+              secondaryContact: t.secondaryContact,
+              startOffset: t.startOffset,
+              endOffset: t.endOffset,
+              duration: dates.duration,
+              plannedStart: asDate(dates.plannedStart)!,
+              plannedEnd: asDate(dates.plannedEnd)!,
+              critical: t.critical,
+              sortOrder: index,
+              status: TaskStatus.NOT_STARTED,
+            };
+          }),
       },
     },
     include: { tasks: true },
@@ -357,7 +410,7 @@ export async function startPlan(
       entity: "launch_plan",
       entityId: locationId,
       entityName: location?.name,
-      summary: `Started the 270-day launch plan for ${location?.name || "a location"} (day 1 ${start})`,
+      summary: `Started the 270-day launch plan for ${location?.name || "a location"} (Day 0 ${start}, opening ${openingDate})`,
     });
   }
 
@@ -374,42 +427,42 @@ export async function saveTemplateFromPlan(
   });
   if (!plan) throw new Error("Plan not found");
 
-  let template = await prisma.launchTemplate.findFirst({
-    where: { isDefault: true },
-  });
-
   const taskData = plan.tasks
     .sort((a, b) => a.sortOrder - b.sortOrder)
     .map((t) => ({
       tid: t.tid,
       phase: t.phase,
+      phaseOrder: t.phaseOrder,
       task: t.task,
       owner: t.owner,
+      primaryContact: t.primaryContact,
+      secondaryContact: t.secondaryContact,
       s: t.startOffset,
       e: t.endOffset,
+      duration: t.duration,
       crit: t.critical,
     }));
 
-  if (!template) {
-    template = await prisma.launchTemplate.create({
-      data: {
-        name: "270-Day Launch Plan",
-        days: 270,
-        isDefault: true,
-        tasks: { create: templateTasksToDb(taskData) },
-      },
-    });
-  } else {
-    await prisma.launchTemplateTask.deleteMany({
-      where: { templateId: template.id },
-    });
-    template = await prisma.launchTemplate.update({
-      where: { id: template.id },
-      data: {
-        tasks: { create: templateTasksToDb(taskData) },
-      },
-    });
-  }
+  // Publish a new version; leave prior default templates (and in-progress plans) intact.
+  await prisma.launchTemplate.updateMany({
+    where: { isDefault: true },
+    data: { isDefault: false },
+  });
+
+  const latest = await prisma.launchTemplate.findFirst({
+    orderBy: { version: "desc" },
+  });
+  const nextVersion = (latest?.version ?? 0) + 1;
+
+  const template = await prisma.launchTemplate.create({
+    data: {
+      name: "270-Day Launch Plan",
+      days: 270,
+      version: nextVersion,
+      isDefault: true,
+      tasks: { create: templateTasksToDb(taskData) },
+    },
+  });
 
   const full = await prisma.launchTemplate.findUniqueOrThrow({
     where: { id: template.id },
@@ -426,7 +479,7 @@ export async function saveTemplateFromPlan(
       entity: "launch_template",
       entityId: full.id,
       entityName: location?.name,
-      summary: `Saved the launch plan for ${location?.name || "a location"} as the default template`,
+      summary: `Published launch template v${nextVersion} from ${location?.name || "a location"}`,
     });
   }
   return templateToApp(full);

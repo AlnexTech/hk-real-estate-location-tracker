@@ -50,7 +50,13 @@ export const PRIOS: Priority[] = ["Low", "Medium", "High", "Back burner"];
 export const OWN = ["", "Corporate", "Franchise", "Corporate + Partner"];
 export const FORMAT = ["", "With Food Court", "Without Food Court"];
 export const COUNTRIES = ["USA", "Canada", "Australia"];
-export const TSTATUS = ["Not Started", "In Progress", "Done", "N/A"] as const;
+export const TSTATUS = [
+  "Not Started",
+  "In Progress",
+  "Blocked",
+  "Done",
+  "N/A",
+] as const;
 export const STATUS_FIELDS = ["stage", "health", "priority"];
 
 export const FIELDS: FieldDef[] = [
@@ -209,7 +215,10 @@ export function searching(l: Location): number | null {
 export function addDays(start: string, n: number): string {
   const d = new Date(start + "T00:00:00");
   d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 export function slug(s: string): string {
@@ -222,13 +231,4 @@ export function slug(s: string): string {
   );
 }
 
-export function planProgress(
-  p?: { tasks?: { status?: string }[] } | null,
-): number | null {
-  if (!p?.tasks?.length) return null;
-  const live = p.tasks.filter((t) => t.status !== "N/A");
-  if (!live.length) return 0;
-  return Math.round(
-    (live.filter((t) => t.status === "Done").length / live.length) * 100,
-  );
-}
+export { planProgress } from "@/lib/launch-schedule";

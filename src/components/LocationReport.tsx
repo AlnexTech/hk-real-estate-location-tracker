@@ -201,9 +201,17 @@ export function LocationReport({
     const openTasks = (plan?.tasks ?? [])
       .filter((t) => t.status !== "Done" && t.status !== "N/A")
       .slice()
-      .sort((a, b) => Number(b.crit) - Number(a.crit) || a.e - b.e);
+      .sort(
+        (a, b) =>
+          Number(b.crit) - Number(a.crit) ||
+          (a.plannedEnd || addDays(plan?.start || "", a.e)).localeCompare(
+            b.plannedEnd || addDays(plan?.start || "", b.e),
+          ),
+      );
     const taskLines = openTasks.slice(0, 8).map((t) => {
-      const end = plan?.start ? addDays(plan.start, t.e) : "";
+      const end =
+        t.plannedEnd ||
+        (plan?.start ? addDays(plan.start, t.e) : "");
       const n = end ? days(end) : null;
       const late = n !== null && !Number.isNaN(n) && n < 0;
       const when = end
@@ -220,8 +228,11 @@ export function LocationReport({
       started: !!plan?.tasks?.length,
       progress,
       startLabel: plan?.start ? fmt(plan.start) || plan.start : "Not set",
+      openingLabel: plan?.openingDate
+        ? fmt(plan.openingDate) || plan.openingDate
+        : "",
       summary: plan?.tasks?.length
-        ? `${done} of ${live.length} tasks done${progress !== null ? ` · ${progress}%` : ""}`
+        ? `${done} of ${live.length} tasks done${progress !== null ? ` · ${progress}%` : ""}${plan.openingDate ? ` · opens ${fmt(plan.openingDate)}` : ""}`
         : "No 270-day launch plan has been started.",
       tasks: taskLines,
       more: Math.max(0, openTasks.length - taskLines.length),
@@ -243,7 +254,11 @@ export function LocationReport({
     if (!history.length) lines.push("Nothing logged yet.");
     else history.forEach((h) => lines.push(`- ${h.text} (${h.meta})`));
     lines.push("", "LAUNCH PLAN", planBlock.summary);
-    if (planBlock.started) lines.push(`Day 1: ${planBlock.startLabel}`);
+    if (planBlock.started) {
+      lines.push(`Day 0: ${planBlock.startLabel}`);
+      if (planBlock.openingLabel)
+        lines.push(`Opening: ${planBlock.openingLabel}`);
+    }
     planBlock.tasks.forEach((t) => lines.push(`- ${t.name} — ${t.meta}`));
     if (planBlock.more) lines.push(`- ${planBlock.more} more open tasks`);
 
@@ -365,7 +380,12 @@ export function LocationReport({
           <div className="report-plan-summary">{model.plan.summary}</div>
           {model.plan.started ? (
             <>
-              <div className="sub">Day 1 · {model.plan.startLabel}</div>
+              <div className="sub">
+                Day 0 · {model.plan.startLabel}
+                {model.plan.openingLabel
+                  ? ` · Opening ${model.plan.openingLabel}`
+                  : ""}
+              </div>
               {model.plan.progress !== null ? (
                 <div className="report-bar" aria-hidden="true">
                   <span style={{ width: `${model.plan.progress}%` }} />
