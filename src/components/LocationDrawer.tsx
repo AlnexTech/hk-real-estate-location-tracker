@@ -2,7 +2,6 @@
 
 import {
   SHORT,
-  STATUS_FIELDS,
   fieldsForLocation,
   fmt,
   healthLabel,
@@ -19,13 +18,11 @@ function FieldInput({
   def,
   loc,
   canWrite,
-  isAdmin,
   onChange,
 }: {
   def: FieldDef;
   loc: Location;
   canWrite: boolean;
-  isAdmin: boolean;
   onChange: (key: string, value: string | number) => void;
 }) {
   if (def[0] === "sec") {
@@ -34,8 +31,7 @@ function FieldInput({
   const [key, label, type, extra] = def;
   const v = (loc as unknown as Record<string, unknown>)[key] ?? "";
   const cls = extra === "full" || type === "textarea" ? "f full" : "f";
-  const mayEdit = isAdmin || STATUS_FIELDS.includes(key);
-  const dis = !(canWrite && mayEdit);
+  const dis = !canWrite;
 
   let input: ReactNode;
   if (type === "select") {
@@ -212,7 +208,7 @@ export function LocationDrawer() {
             </button>
           </div>
           <h2
-            contentEditable={canWrite && isAdmin}
+            contentEditable={canWrite}
             suppressContentEditableWarning
             spellCheck={false}
             onBlur={(e) => {
@@ -354,7 +350,6 @@ export function LocationDrawer() {
                   def={f}
                   loc={loc}
                   canWrite={canWrite}
-                  isAdmin={isAdmin}
                   onChange={onField}
                 />
               ))}
@@ -369,7 +364,6 @@ export function LocationDrawer() {
                 def={f}
                 loc={loc}
                 canWrite={canWrite}
-                isAdmin={isAdmin}
                 onChange={onField}
               />
             ))}

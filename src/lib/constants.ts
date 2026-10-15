@@ -51,7 +51,6 @@ export const OWN = ["", "Corporate", "Franchise", "Corporate + Partner"];
 export const FORMAT = ["", "With Food Court", "Without Food Court"];
 export const COUNTRIES = ["USA", "Canada", "Australia"];
 export const TSTATUS = ["Not Started", "In Progress", "Done", "N/A"] as const;
-export const STATUS_FIELDS = ["stage", "health", "priority"];
 
 export const FIELDS: FieldDef[] = [
   ["sec", "Location"],

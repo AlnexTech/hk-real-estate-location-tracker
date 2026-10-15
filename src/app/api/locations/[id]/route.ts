@@ -20,7 +20,7 @@ export async function PATCH(request: Request, context: Ctx) {
     }
     if (!isAdminRole(actor.role) && !agentMayPatchLocation(body.patch)) {
       return NextResponse.json(
-        { error: "Only an admin can edit those fields" },
+        { error: "That field cannot be edited" },
         { status: 403 },
       );
     }
